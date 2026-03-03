@@ -5,6 +5,10 @@ import AdminTeams from '../views/admin/AdminTeams.vue'
 import AdminEvaluators from '../views/admin/AdminEvaluators.vue'
 import { useAuthStore } from '../stores/auth.js'
 import AdminQuestions from '../views/admin/AdminQuestions.vue'
+import AdminAssignments from '../views/admin/AdminAssignments.vue'
+import AdminTemplates from '../views/admin/AdminTemplates.vue'
+
+
 
 const routes = [
   { path: '/', redirect: '/login' },         
@@ -12,7 +16,9 @@ const routes = [
   { path: '/admin/dashboard', component: AdminDashboard, meta: { requiresAuth: true } },
   { path: '/admin/teams', component: AdminTeams, meta: { requiresAuth: true } },
   { path: '/admin/evaluators', component: AdminEvaluators, meta: { requiresAuth: true } },
-  { path: '/admin/questions', component: AdminQuestions, meta: { requiresAuth: true } }
+  { path: '/admin/questions', component: AdminQuestions, meta: { requiresAuth: true } },
+  { path: '/admin/assignments', component: AdminAssignments, meta: { requiresAuth: true } },
+  { path: '/admin/templates', component: AdminTemplates, meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({

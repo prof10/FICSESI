@@ -18,6 +18,12 @@
         <p>Definir questões (0 a 5).</p>
       </div>
 
+      <div class="card" @click="go('/admin/templates')">
+        <h3>Modelos de Avaliação</h3>
+        <p>Definir conjuntos de perguntas para online/presencial.</p>
+    </div>
+
+
       <div class="card" @click="go('/admin/assignments')">
         <h3>Atribuir Provas</h3>
         <p>Gerar códigos para avaliadores.</p>
@@ -27,6 +33,8 @@
         <h3>Ranking por Premiação</h3>
         <p>Ver resultados por categoria.</p>
       </div>
+
+
     </div>
   </div>
 </template>
