@@ -9,8 +9,12 @@
       <p><strong>Número do estande:</strong> {{ evaluation.team?.numero_estande }}</p>
       <p><strong>Equipe:</strong> {{ evaluation.team?.name }}</p>
       <p><strong>Escola:</strong> {{ evaluation.team?.escola }}</p>
-      <p><strong>Cidade:</strong> {{ evaluation.team?.cidade }}</p>
+      <p><strong>Cidade:</strong> {{ evaluation.team?.cidade }}</p>  
+      <p><strong>Etapa de Ensino:</strong> {{ evaluation.team?.etapa_ensino }}</p>    
+      <p><strong>Área do Conhecimento:</strong> {{ evaluation.team?.area_conhecimento }} </p>
+      <p><strong>Categoria:</strong> {{ evaluation.team?.category }} </p>
       <p><strong>Avaliador:</strong> {{ evaluation.evaluator?.name }} ({{ evaluation.evaluator?.email }})</p>
+      
       <p>
         <strong>Modelo:</strong>
         {{ evaluation.template?.name }}
@@ -69,7 +73,7 @@ const loadEvaluation = async () => {
       code,
       status,
       created_at,
-      team:teams ( name, escola, cidade, numero_estande ),
+      team:teams ( name, escola, cidade, numero_estande, area_conhecimento, category, etapa_ensino),
       evaluator:evaluators ( name, email ),
       template:evaluation_templates ( name, type ),
       answers:evaluation_answers (

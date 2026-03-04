@@ -29,7 +29,7 @@
         <p>Gerar códigos para avaliadores.</p>
       </div>
 
-      <div class="card" @click="go('/admin/rankings')">
+      <div class="card" @click="go('/admin/ranking')">
         <h3>Ranking por Premiação</h3>
         <p>Ver resultados por categoria.</p>
       </div>
