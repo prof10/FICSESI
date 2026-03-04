@@ -8,6 +8,8 @@ import AdminQuestions from '../views/admin/AdminQuestions.vue'
 import AdminAssignments from '../views/admin/AdminAssignments.vue'
 import AdminTemplates from '../views/admin/AdminTemplates.vue'
 import EvaluatorForm from '../views/EvaluatorForm.vue' 
+import AdminEvaluationDetails from '../views/admin/AdminEvaluationDetails.vue'
+
 
 const routes = [
   { path: '/', redirect: '/login' },
@@ -20,6 +22,8 @@ const routes = [
   { path: '/admin/questions', component: AdminQuestions, meta: { requiresAuth: true } },
   { path: '/admin/assignments', component: AdminAssignments, meta: { requiresAuth: true } },
   { path: '/admin/templates', component: AdminTemplates, meta: { requiresAuth: true } },
+  { path: '/admin/evaluations/:id', component: AdminEvaluationDetails, meta: { requiresAuth: true } },
+
 
   // rota do avaliador (sem login)
   { path: '/avaliar', component: EvaluatorForm }

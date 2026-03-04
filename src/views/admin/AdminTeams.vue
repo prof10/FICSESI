@@ -65,7 +65,7 @@
           <td>{{ team.category }}</td>
           
           <td>
-            <button @click="editTeam(team)">Editar</button>
+            
             <button @click="deleteTeam(team.id)">Excluir</button>
           </td>
         </tr>
@@ -128,9 +128,7 @@ const deleteTeam = async (id) => {
   }
 }
 
-const editTeam = (team) => {
-  alert('Edição futura: ' + team.name)
-}
+
 
 onMounted(loadTeams)
 </script>

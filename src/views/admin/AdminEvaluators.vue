@@ -41,7 +41,7 @@
           <td>{{ ev.email }}</td>
           <td>{{ ev.area_conhecimento }}</td>
           <td>
-            <button @click="editEvaluator(ev)">Editar</button>
+            
             <button @click="deleteEvaluator(ev.id)">Excluir</button>
           </td>
         </tr>
@@ -93,9 +93,7 @@ const deleteEvaluator = async (id) => {
   }
 }
 
-const editEvaluator = (ev) => {
-  alert('Edição futura: ' + ev.name)
-}
+
 
 onMounted(loadEvaluators)
 </script>

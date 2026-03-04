@@ -37,7 +37,7 @@
           <td>{{ q.text }}</td>
           <td>{{ q.type === 'escala' ? 'Escala 0–5' : 'Aberta' }}</td>
           <td>
-            <button @click="editQuestion(q)">Editar</button>
+           
             <button @click="deleteQuestion(q.id)">Excluir</button>
           </td>
         </tr>
@@ -85,9 +85,7 @@ const deleteQuestion = async (id) => {
   }
 }
 
-const editQuestion = (q) => {
-  alert('Edição futura: ' + q.text)
-}
+
 
 onMounted(loadQuestions)
 </script>

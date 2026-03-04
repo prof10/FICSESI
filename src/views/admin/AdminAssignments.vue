@@ -52,6 +52,7 @@
           <td>
             <button @click="copyCode(a.code)">Copiar Código</button>
             <button @click="deleteAssignment(a.id)">Excluir</button>
+            <button @click="goToEvaluationDetails(a.id)">Ver respostas</button>
           </td>
         </tr>
       </tbody>
@@ -62,6 +63,10 @@
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
 import { ref, onMounted } from 'vue'
 import {
   assignmentsService,
@@ -82,6 +87,11 @@ const selectedTemplateId = ref('')
 
 const error = ref('')
 
+const goToEvaluationDetails = (id) => {
+  router.push(`/admin/evaluations/${id}`)
+}
+
+
 const loadAll = async () => {
   try {
     teams.value = await teamsService.getAll()
@@ -98,7 +108,7 @@ const createAssignment = async () => {
     const team = teams.value.find(t => t.id === selectedTeamId.value)
     if (!team) throw new Error('Equipe não encontrada')
 
-    const randomPart = generateRandomCode(8)
+    const randomPart = generateRandomCode(4)
     const prefix = team.numero_estande || 'SEMEST'
     const fullCode = `${prefix}-${randomPart}`
 
