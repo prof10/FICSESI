@@ -1,4 +1,4 @@
-import { supabase } from '../composables/useSupabase.js' 
+import { supabase } from '../composables/useSupabase.js'
 
 export const teamsService = {
   async getAll() {
@@ -12,7 +12,11 @@ export const teamsService = {
     return data[0]
   },
   async update(id, team) {
-    const { data, error } = await supabase.from('teams').update(team).eq('id', id).select()
+    const { data, error } = await supabase
+      .from('teams')
+      .update(team)
+      .eq('id', id)
+      .select()
     if (error) throw error
     return data[0]
   },
@@ -24,12 +28,18 @@ export const teamsService = {
 
 export const evaluatorsService = {
   async getAll() {
-    const { data, error } = await supabase.from('evaluators').select('*').order('name')
+    const { data, error } = await supabase
+      .from('evaluators')
+      .select('*')
+      .order('name')
     if (error) throw error
     return data || []
   },
   async create(evaluator) {
-    const { data, error } = await supabase.from('evaluators').insert([evaluator]).select()
+    const { data, error } = await supabase
+      .from('evaluators')
+      .insert([evaluator])
+      .select()
     if (error) throw error
     return data[0]
   },
@@ -50,9 +60,7 @@ export const evaluatorsService = {
 
 export const questionsService = {
   async getAll() {
-    const { data, error } = await supabase
-      .from('questions')
-      .select('*')
+    const { data, error } = await supabase.from('questions').select('*')
     if (error) throw error
     return data || []
   },
@@ -70,13 +78,23 @@ export const questionsService = {
   }
 }
 
+// helper para códigos aleatórios
+export function generateRandomCode(length = 8) {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  let result = ''
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
+}
+
 export const assignmentsService = {
   async getAll() {
     const { data, error } = await supabase
       .from('assignments')
       .select(`
         id, code, status, created_at,
-        team:teams ( id, name, escola, cidade ),
+        team:teams ( id, name, escola, cidade, numero_estande ),
         evaluator:evaluators ( id, name, email, area_conhecimento ),
         template:evaluation_templates ( id, name, type )
       `)
@@ -84,9 +102,9 @@ export const assignmentsService = {
     if (error) throw error
     return data || []
   },
-  
+
+  // aqui o code já vem pronto (ex: "A12-3f9a7cde")
   async create(assignment) {
-    // evaluator_id, team_id, tipo
     const { data, error } = await supabase
       .from('assignments')
       .insert([assignment])
@@ -144,7 +162,6 @@ export const templateQuestionsService = {
     return data || []
   },
   async saveTemplateQuestions(templateId, questionIds) {
-    // estratégia simples: apaga tudo e recria
     const { error: delError } = await supabase
       .from('evaluation_template_questions')
       .delete()
@@ -167,6 +184,3 @@ export const templateQuestionsService = {
     return data
   }
 }
-
-
-

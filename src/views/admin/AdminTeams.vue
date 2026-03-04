@@ -3,6 +3,7 @@
     <h2>Cadastro de Equipes</h2>
 
     <form @submit.prevent="createTeam" class="form">
+      <input v-model="newTeam.numero_estande" placeholder="N° Estande" />
       <input v-model="newTeam.name" placeholder="Nome da Equipe" required />
       <input v-model="newTeam.escola" placeholder="Escola" required />
       <input v-model="newTeam.cidade" placeholder="Cidade" required />
@@ -43,6 +44,7 @@
     <table class="table">
       <thead>
         <tr>
+          <th>N° Estande</th>
           <th>Nome</th>
           <th>Escola</th>
           <th>Cidade</th>
@@ -54,6 +56,7 @@
       </thead>
       <tbody>
         <tr v-for="team in teams" :key="team.id">
+          <td>{{ team.numero_estande }}</td>
           <td>{{ team.name }}</td>
           <td>{{ team.escola }}</td>
           <td>{{ team.cidade }}</td>
@@ -79,6 +82,7 @@ import { teamsService } from '@/services/supabase.js'
 
 const teams = ref([])
 const newTeam = ref({
+  numero_estande: '',
   name: '',
   escola: '',
   cidade: '',

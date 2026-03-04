@@ -67,7 +67,8 @@ import {
   assignmentsService,
   teamsService,
   evaluatorsService,
-  templatesService
+  templatesService,
+  generateRandomCode
 } from '@/services/supabase.js'
 
 const teams = ref([])
@@ -94,11 +95,20 @@ const loadAll = async () => {
 
 const createAssignment = async () => {
   try {
+    const team = teams.value.find(t => t.id === selectedTeamId.value)
+    if (!team) throw new Error('Equipe não encontrada')
+
+    const randomPart = generateRandomCode(8)
+    const prefix = team.numero_estande || 'SEMEST'
+    const fullCode = `${prefix}-${randomPart}`
+
     await assignmentsService.create({
       team_id: selectedTeamId.value,
       evaluator_id: selectedEvaluatorId.value,
-      template_id: selectedTemplateId.value
+      template_id: selectedTemplateId.value,
+      code: fullCode
     })
+
     selectedTeamId.value = ''
     selectedEvaluatorId.value = ''
     selectedTemplateId.value = ''
