@@ -18,6 +18,20 @@
       </div>
 
       <div class="filter-block">
+        <h3>Etapa de ensino</h3>
+        <div v-for="etapa in etapas" :key="etapa" class="checkbox-item">
+          <label>
+            <input
+              type="checkbox"
+              v-model="selectedEtapas"
+              :value="etapa"
+            />
+            {{ etapa }}
+          </label>
+        </div>
+      </div>
+
+      <div class="filter-block">
         <h3>Modelos de avaliação</h3>
         <div
           v-for="tpl in templates"
@@ -39,7 +53,12 @@
     <button
       class="load-btn"
       @click="loadRanking"
-      :disabled="loading || selectedCategories.length === 0 || selectedTemplateIds.length === 0"
+      :disabled="
+        loading ||
+        !selectedCategories.length ||
+        !selectedEtapas.length ||
+        !selectedTemplateIds.length
+      "
     >
       {{ loading ? 'Carregando...' : 'Gerar ranking' }}
     </button>
@@ -52,6 +71,7 @@
           <th>Posição</th>
           <th>Equipe</th>
           <th>Categoria</th>
+          <th>Etapa</th>
           <th>Pontuação</th>
         </tr>
       </thead>
@@ -60,6 +80,7 @@
           <td>{{ index + 1 }}</td>
           <td>{{ row.team_name }}</td>
           <td>{{ row.category }}</td>
+          <td>{{ row.etapa_ensino }}</td>
           <td>{{ row.total_score }}</td>
         </tr>
       </tbody>
@@ -76,9 +97,11 @@ import { ref, onMounted } from 'vue'
 import { supabase } from '@/composables/useSupabase.js'
 
 const categories = ref([])
+const etapas = ref([])
 const templates = ref([])
 
 const selectedCategories = ref([])
+const selectedEtapas = ref([])
 const selectedTemplateIds = ref([])
 
 const ranking = ref([])
@@ -88,13 +111,13 @@ const error = ref('')
 const loadFilters = async () => {
   error.value = ''
 
-  // categorias distintas a partir de teams
+  // categorias e etapas distintas a partir de teams
   const { data: teamsData, error: teamsError } = await supabase
     .from('teams')
-    .select('category')
+    .select('category, etapa_ensino')
 
   if (teamsError) {
-    error.value = 'Erro ao carregar categorias.'
+    error.value = 'Erro ao carregar categorias/etapas.'
     return
   }
 
@@ -104,6 +127,13 @@ const loadFilters = async () => {
       .filter(c => !!c)
   )
   categories.value = Array.from(setCats).sort()
+
+  const setEtapas = new Set(
+    (teamsData || [])
+      .map(t => t.etapa_ensino)
+      .filter(e => !!e)
+  )
+  etapas.value = Array.from(setEtapas).sort()
 
   // modelos de avaliação
   const { data: tplData, error: tplError } = await supabase
@@ -125,15 +155,22 @@ const loadRanking = async () => {
   loading.value = true
 
   try {
-    if (!selectedCategories.value.length || !selectedTemplateIds.value.length) {
-      error.value = 'Selecione pelo menos uma categoria e um modelo de avaliação.'
+    if (
+      !selectedCategories.value.length ||
+      !selectedEtapas.value.length ||
+      !selectedTemplateIds.value.length
+    ) {
+      error.value = 'Selecione pelo menos uma categoria, uma etapa e um modelo.'
       return
     }
 
     const { data, error: rankError } = await supabase
       .from('team_scores')
-      .select('team_id, team_name, category, template_id, total_score')
+      .select(
+        'team_id, team_name, category, etapa_ensino, template_id, total_score'
+      )
       .in('category', selectedCategories.value)
+      .in('etapa_ensino', selectedEtapas.value)
       .in('template_id', selectedTemplateIds.value)
       .order('total_score', { ascending: false })
 
@@ -142,8 +179,7 @@ const loadRanking = async () => {
       return
     }
 
-    // Se uma mesma equipe aparecer em mais de um template selecionado,
-    // somamos os scores para mostrar uma linha única por equipe.
+    // Somar pontuações da mesma equipe em múltiplos templates selecionados
     const byTeam = new Map()
 
     for (const row of data || []) {
