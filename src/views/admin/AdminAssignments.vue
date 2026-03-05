@@ -73,7 +73,17 @@
               <td>{{ a.evaluator?.name }}</td>
               <td>{{ a.template?.name }}</td>
               <td>{{ a.template?.type === 'online' ? 'Online' : 'Presencial' }}</td>
-              <td>{{ a.status }}</td>
+              <td>
+                <span
+                  class="status-pill"
+                  :class="{
+                    pending: a.status === 'pendente',
+                    done: a.status === 'respondido'
+                  }"
+                >
+                  {{ a.status }}
+                </span>
+              </td>
               <td>{{ formatDate(a.created_at) }}</td>
               <td class="col-actions">
                 <button class="btn-secondary" @click="copyCode(a.code)">
@@ -347,6 +357,29 @@ onMounted(loadAll)
   color: #118c3a;
   font-size: 12px;
   font-weight: 600;
+}
+
+/* Status colorido */
+.status-pill {
+  display: inline-block;
+  min-width: 80px;
+  text-align: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-pill.pending {
+  background: rgba(239, 83, 80, 0.12);
+  color: #d32f2f;
+}
+
+.status-pill.done {
+  background: rgba(0, 179, 74, 0.14);
+  color: #118c3a;
 }
 
 .col-actions {
