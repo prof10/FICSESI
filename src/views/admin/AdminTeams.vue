@@ -1,6 +1,6 @@
 <template>
   <div class="admin-teams">
-    <h2>Cadastro de Equipes</h2>
+    <h2>EQUIPES</h2>
 
     <form @submit.prevent="createTeam" class="form">
       <input v-model="newTeam.numero_estande" placeholder="N° Estande" />
@@ -49,8 +49,8 @@
           <th>Escola</th>
           <th>Cidade</th>
           <th>Área de Conhecimento</th>
-          <th>Etapa</th>
-          <th>Premiação</th>          
+          <th>Etapa de Ensino</th>
+          <th>Categoria (Premiação)</th>          
           <th>Ações</th>
         </tr>
       </thead>

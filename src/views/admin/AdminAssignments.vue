@@ -1,6 +1,6 @@
 <template>
   <div class="admin-assignments">
-    <h2>Atribuição de Provas</h2>
+    <h2>ATRIBUIÇÃO DE AVALIAÇÕES</h2>
 
     <form @submit.prevent="createAssignment" class="form">
       <select v-model="selectedTeamId" required>

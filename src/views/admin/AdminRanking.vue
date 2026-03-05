@@ -1,10 +1,10 @@
 <template>
   <div class="admin-ranking">
-    <h2>Ranking de Equipes</h2>
+    <h2>RANKING</h2>
 
     <div class="filters">
       <div class="filter-block">
-        <h3>Categorias (premiações)</h3>
+        <h3>Categorias (Premiações)</h3>
         <div v-for="cat in categories" :key="cat" class="checkbox-item">
           <label>
             <input

@@ -4,34 +4,33 @@
 
     <div class="cards">
       <div class="card" @click="go('/admin/teams')">
-        <h3>Cadastro de Equipes</h3>
-        <p>Gerenciar equipes e premiações.</p>
+        <h3>EQUIPES</h3>        
       </div>
 
       <div class="card" @click="go('/admin/evaluators')">
-        <h3>Cadastro de Avaliadores</h3>
-        <p>Cadastrar e editar avaliadores.</p>
+        <h3>AVALIADORES</h3>
+        
       </div>
 
       <div class="card" @click="go('/admin/questions')">
-        <h3>Perguntas da Prova</h3>
-        <p>Definir questões (0 a 5).</p>
+        <h3>QUESTÕES</h3>
+        
       </div>
 
       <div class="card" @click="go('/admin/templates')">
-        <h3>Modelos de Avaliação</h3>
-        <p>Definir conjuntos de perguntas para online/presencial.</p>
+        <h3>AVALIAÇÕES</h3>
+        
     </div>
 
 
       <div class="card" @click="go('/admin/assignments')">
-        <h3>Atribuir Provas</h3>
-        <p>Gerar códigos para avaliadores.</p>
+        <h3>ATRIBUIÇÃO DE AVALIAÇÕES</h3>
+        
       </div>
 
       <div class="card" @click="go('/admin/ranking')">
-        <h3>Ranking por Premiação</h3>
-        <p>Ver resultados por categoria.</p>
+        <h3>RANKING</h3>
+        
       </div>
 
 

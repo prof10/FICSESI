@@ -1,6 +1,6 @@
 <template>
   <div class="admin-evaluators">
-    <h2>Cadastro de Avaliadores</h2>
+    <h2>AVALIADORES</h2>
 
     <form @submit.prevent="createEvaluator" class="form">
       <input

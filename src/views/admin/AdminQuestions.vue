@@ -1,6 +1,6 @@
 <template>
   <div class="admin-questions">
-    <h2>Perguntas da Prova</h2>
+    <h2>QUESTÕES</h2>
 
     <form @submit.prevent="createQuestion" class="form">
       <input
