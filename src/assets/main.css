@@ -33,3 +33,15 @@ a,
     padding: 0 2rem;
   }
 }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  overflow: hidden; /* remove scroll vertical na página toda */
+}
+
+

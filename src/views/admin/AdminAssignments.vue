@@ -1,62 +1,99 @@
 <template>
   <div class="admin-assignments">
-    <h2>ATRIBUIÇÃO DE AVALIAÇÕES</h2>
+    <header class="page-header">
+      <h1>Atribuição de avaliações</h1>
+      <p>Vincule equipes, avaliadores e modelos para gerar códigos de avaliação.</p>
+    </header>
 
-    <form @submit.prevent="createAssignment" class="form">
-      <select v-model="selectedTeamId" required>
-        <option value="" disabled>Selecione a Equipe</option>
-        <option v-for="team in teams" :key="team.id" :value="team.id">
-          {{ team.name }} - {{ team.escola }} ({{ team.cidade }})
-        </option>
-      </select>
+    <section class="card form-card">
+      <h2>Gerar código de avaliação</h2>
 
-      <select v-model="selectedEvaluatorId" required>
-        <option value="" disabled>Selecione o Avaliador</option>
-        <option v-for="ev in evaluators" :key="ev.id" :value="ev.id">
-          {{ ev.name }} - {{ ev.area_conhecimento }}
-        </option>
-      </select>
+      <form @submit.prevent="createAssignment" class="form-grid">
+        <div>
+          <label class="label">Equipe</label>
+          <select v-model="selectedTeamId" required>
+            <option value="" disabled>Selecione a equipe</option>
+            <option v-for="team in teams" :key="team.id" :value="team.id">
+              {{ team.numero_estande || '—' }} — {{ team.name }} ·
+              {{ team.escola }} ({{ team.cidade }})
+            </option>
+          </select>
+        </div>
 
-      <select v-model="selectedTemplateId" required>
-        <option value="" disabled>Modelo de Avaliação</option>
-        <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">
-          {{ tpl.name }} ({{ tpl.type === 'online' ? 'Online' : 'Presencial' }})
-        </option>
-      </select>
+        <div>
+          <label class="label">Avaliador</label>
+          <select v-model="selectedEvaluatorId" required>
+            <option value="" disabled>Selecione o avaliador</option>
+            <option v-for="ev in evaluators" :key="ev.id" :value="ev.id">
+              {{ ev.name }} — {{ ev.area_conhecimento }}
+            </option>
+          </select>
+        </div>
 
-      <button type="submit">Gerar Código</button>
-    </form>
+        <div>
+          <label class="label">Modelo de avaliação</label>
+          <select v-model="selectedTemplateId" required>
+            <option value="" disabled>Selecione o modelo</option>
+            <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">
+              {{ tpl.name }} ({{ tpl.type === 'online' ? 'Online' : 'Presencial' }})
+            </option>
+          </select>
+        </div>
 
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Código</th>
-          <th>Equipe</th>
-          <th>Avaliador</th>
-          <th>Modelo</th>
-          <th>Tipo</th>
-          <th>Status</th>
-          <th>Criado em</th>
-          <th>Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="a in assignments" :key="a.id">
-          <td>{{ a.code }}</td>
-          <td>{{ a.team?.name }}</td>
-          <td>{{ a.evaluator?.name }}</td>
-          <td>{{ a.template?.name }}</td>
-          <td>{{ a.template?.type === 'online' ? 'Online' : 'Presencial' }}</td>
-          <td>{{ a.status }}</td>
-          <td>{{ formatDate(a.created_at) }}</td>
-          <td>
-            <button @click="copyCode(a.code)">Copiar Código</button>
-            <button @click="deleteAssignment(a.id)">Excluir</button>
-            <button @click="goToEvaluationDetails(a.id)">Ver respostas</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+        <div class="form-actions">
+          <button type="submit">Gerar código</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card table-card">
+      <div class="table-header">
+        <h2>Atribuições geradas</h2>
+        <span class="table-count">{{ assignments.length }} código(s)</span>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Equipe</th>
+              <th>Avaliador</th>
+              <th>Modelo</th>
+              <th>Tipo</th>
+              <th>Status</th>
+              <th>Criado em</th>
+              <th class="col-actions">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="a in assignments" :key="a.id">
+              <td><span class="code-pill">{{ a.code }}</span></td>
+              <td>{{ a.team?.name }}</td>
+              <td>{{ a.evaluator?.name }}</td>
+              <td>{{ a.template?.name }}</td>
+              <td>{{ a.template?.type === 'online' ? 'Online' : 'Presencial' }}</td>
+              <td>{{ a.status }}</td>
+              <td>{{ formatDate(a.created_at) }}</td>
+              <td class="col-actions">
+                <button class="btn-secondary" @click="copyCode(a.code)">
+                  Copiar
+                </button>
+                <button class="btn-secondary" @click="goToEvaluationDetails(a.id)">
+                  Ver respostas
+                </button>
+                <button class="btn-danger" @click="deleteAssignment(a.id)">
+                  Excluir
+                </button>
+              </td>
+            </tr>
+            <tr v-if="!assignments.length">
+              <td colspan="8" class="empty">Nenhuma atribuição cadastrada.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <p v-if="error" class="error">{{ error }}</p>
   </div>
@@ -64,9 +101,6 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
-
-const router = useRouter()
-
 import { ref, onMounted } from 'vue'
 import {
   assignmentsService,
@@ -76,6 +110,8 @@ import {
   generateRandomCode
 } from '@/services/supabase.js'
 
+const router = useRouter()
+
 const teams = ref([])
 const evaluators = ref([])
 const templates = ref([])
@@ -84,13 +120,11 @@ const assignments = ref([])
 const selectedTeamId = ref('')
 const selectedEvaluatorId = ref('')
 const selectedTemplateId = ref('')
-
 const error = ref('')
 
 const goToEvaluationDetails = (id) => {
   router.push(`/admin/evaluations/${id}`)
 }
-
 
 const loadAll = async () => {
   try {
@@ -105,7 +139,7 @@ const loadAll = async () => {
 
 const createAssignment = async () => {
   try {
-    const team = teams.value.find(t => t.id === selectedTeamId.value)
+    const team = teams.value.find((t) => t.id === selectedTeamId.value)
     if (!team) throw new Error('Equipe não encontrada')
 
     const randomPart = generateRandomCode(4)
@@ -156,26 +190,230 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
-.form {
-  margin: 20px 0;
+.admin-assignments {
+  min-height: 100vh;
+  padding: 28px 32px 40px;
+  background: linear-gradient(135deg, #b7f5a6 0%, #e3ffda 40%, #ffffff 100%);
+  box-sizing: border-box;
+}
+
+.page-header {
+  max-width: 1080px;
+  margin: 0 auto 20px;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 24px;
+  color: #118c3a;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-header p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #546e7a;
+}
+
+.card {
+  max-width: 1080px;
+  margin: 0 auto 20px;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 20px 22px 22px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(17, 140, 58, 0.06);
+}
+
+.card h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+  letter-spacing: 0.09em;
+  color: #118c3a;
+  text-transform: uppercase;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #78909c;
+}
+
+.form-grid select {
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: 999px;
+  border: 1px solid #cfd8dc;
+  font-size: 13px;
+  box-sizing: border-box;
+  outline: none;
+  background-color: #fdfdfd;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.form-grid select:focus {
+  border-color: #118c3a;
+  box-shadow: 0 0 0 2px rgba(17, 140, 58, 0.18);
+}
+
+.form-actions {
+  grid-column: 1 / -1;
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-top: 6px;
 }
-.form select,
-.form button {
-  padding: 8px;
+
+.form-actions button {
+  border: none;
+  border-radius: 999px;
+  padding: 9px 20px;
+  background: #00b34a;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: 0 6px 18px rgba(0, 179, 74, 0.38);
+  transition: background 0.18s, transform 0.18s, box-shadow 0.18s;
 }
+
+.form-actions button:hover {
+  background: #02983f;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0, 179, 74, 0.45);
+}
+
+.table-card {
+  overflow: hidden;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.table-count {
+  font-size: 12px;
+  color: #78909c;
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 13px;
 }
+
 .table th,
 .table td {
-  border: 1px solid #ddd;
-  padding: 8px;
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 1px solid #eceff1;
 }
+
+.table th {
+  font-weight: 600;
+  color: #455a64;
+  background-color: #f5f9f6;
+}
+
+.table tbody tr:hover {
+  background-color: #f9fcf9;
+}
+
+.code-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(17, 140, 58, 0.08);
+  color: #118c3a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.col-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.btn-secondary {
+  border: none;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #ffffff;
+  color: #118c3a;
+  border: 1px solid rgba(17, 140, 58, 0.25);
+  margin-right: 6px;
+  transition: background 0.18s, color 0.18s, transform 0.18s;
+}
+
+.btn-secondary:hover {
+  background: #118c3a;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.btn-danger {
+  border: none;
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #ef5350;
+  color: #ffffff;
+  transition: background 0.18s, transform 0.18s;
+}
+
+.btn-danger:hover {
+  background: #d32f2f;
+  transform: translateY(-1px);
+}
+
+.empty {
+  text-align: center;
+  padding: 20px 8px;
+  color: #90a4ae;
+}
+
 .error {
-  color: red;
+  max-width: 1080px;
+  margin: 0 auto;
+  color: #d32f2f;
+  font-size: 13px;
+  padding-top: 4px;
+}
+
+@media (max-width: 900px) {
+  .admin-assignments {
+    padding: 20px 14px 28px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 18px 16px 18px;
+  }
 }
 </style>
