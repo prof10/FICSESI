@@ -57,25 +57,60 @@
     <section class="card table-card">
       <div class="table-header">
         <h2>Equipes cadastradas</h2>
-        <span class="table-count">{{ teams.length }} equipe(s)</span>
+        <span class="table-count">{{ sortedTeams.length }} equipe(s)</span>
       </div>
 
       <div class="table-wrapper">
         <table class="table">
           <thead>
             <tr>
-              <th>N° Estande</th>
-              <th>Nome</th>
-              <th>Escola</th>
-              <th>Cidade</th>
-              <th>Área de Conhecimento</th>
-              <th>Etapa de Ensino</th>
-              <th>Categoria</th>
+              <th @click="setSort('numero_estande')" class="sortable">
+                N° Estande
+                <span class="sort-icon" v-if="sortBy === 'numero_estande'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('name')" class="sortable">
+                Nome
+                <span class="sort-icon" v-if="sortBy === 'name'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('escola')" class="sortable">
+                Escola
+                <span class="sort-icon" v-if="sortBy === 'escola'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('cidade')" class="sortable">
+                Cidade
+                <span class="sort-icon" v-if="sortBy === 'cidade'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('area_conhecimento')" class="sortable">
+                Área de Conhecimento
+                <span class="sort-icon" v-if="sortBy === 'area_conhecimento'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('etapa_ensino')" class="sortable">
+                Etapa de Ensino
+                <span class="sort-icon" v-if="sortBy === 'etapa_ensino'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('category')" class="sortable">
+                Categoria
+                <span class="sort-icon" v-if="sortBy === 'category'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
               <th class="col-actions">Ações</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="team in teams" :key="team.id">
+            <tr v-for="team in sortedTeams" :key="team.id">
               <td>{{ team.numero_estande }}</td>
               <td>{{ team.name }}</td>
               <td>{{ team.escola }}</td>
@@ -87,7 +122,7 @@
                 <button class="btn-danger" @click="deleteTeam(team.id)">Excluir</button>
               </td>
             </tr>
-            <tr v-if="!teams.length">
+            <tr v-if="!sortedTeams.length">
               <td colspan="8" class="empty">Nenhuma equipe cadastrada.</td>
             </tr>
           </tbody>
@@ -100,7 +135,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { teamsService } from '@/services/supabase.js'
 
 const teams = ref([])
@@ -114,6 +149,10 @@ const newTeam = ref({
   etapa_ensino: ''
 })
 const error = ref('')
+
+// estado de ordenação
+const sortBy = ref('name')
+const sortDir = ref('asc') // 'asc' | 'desc'
 
 const loadTeams = async () => {
   try {
@@ -152,7 +191,41 @@ const deleteTeam = async (id) => {
   }
 }
 
+// alterna campo/direção de ordenação
+const setSort = (field) => {
+  if (sortBy.value === field) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortBy.value = field
+    sortDir.value = 'asc'
+  }
+}
+
+// lista ordenada (não mexe no array original)
+const sortedTeams = computed(() => {
+  const arr = [...teams.value]
+  arr.sort((a, b) => {
+    const fa = a[sortBy.value] ?? ''
+    const fb = b[sortBy.value] ?? ''
+
+    // tenta comparar numericamente quando for N° estande
+    if (sortBy.value === 'numero_estande') {
+      const na = Number(fa) || 0
+      const nb = Number(fb) || 0
+      return sortDir.value === 'asc' ? na - nb : nb - na
+    }
+
+    const sa = String(fa).toLocaleLowerCase('pt-BR')
+    const sb = String(fb).toLocaleLowerCase('pt-BR')
+    if (sa < sb) return sortDir.value === 'asc' ? -1 : 1
+    if (sa > sb) return sortDir.value === 'asc' ? 1 : -1
+    return 0
+  })
+  return arr
+})
+
 onMounted(loadTeams)
+
 </script>
 
 <style scoped>
@@ -349,5 +422,20 @@ onMounted(loadTeams)
   .card {
     padding: 18px 16px 18px;
   }
+}
+
+.table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.table th.sortable:hover {
+  background-color: #ecf4ee;
+}
+
+.sort-icon {
+  margin-left: 4px;
+  font-size: 11px;
+  color: #78909c;
 }
 </style>

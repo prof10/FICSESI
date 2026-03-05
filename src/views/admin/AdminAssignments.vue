@@ -49,25 +49,60 @@
     <section class="card table-card">
       <div class="table-header">
         <h2>Atribuições geradas</h2>
-        <span class="table-count">{{ assignments.length }} código(s)</span>
+        <span class="table-count">{{ sortedAssignments.length }} código(s)</span>
       </div>
 
       <div class="table-wrapper">
         <table class="table">
           <thead>
             <tr>
-              <th>Código</th>
-              <th>Equipe</th>
-              <th>Avaliador</th>
-              <th>Modelo</th>
-              <th>Tipo</th>
-              <th>Status</th>
-              <th>Criado em</th>
+              <th @click="setSort('code')" class="sortable">
+                Código
+                <span class="sort-icon" v-if="sortBy === 'code'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('team')" class="sortable">
+                Equipe
+                <span class="sort-icon" v-if="sortBy === 'team'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('evaluator')" class="sortable">
+                Avaliador
+                <span class="sort-icon" v-if="sortBy === 'evaluator'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('template')" class="sortable">
+                Modelo
+                <span class="sort-icon" v-if="sortBy === 'template'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('type')" class="sortable">
+                Tipo
+                <span class="sort-icon" v-if="sortBy === 'type'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('status')" class="sortable">
+                Status
+                <span class="sort-icon" v-if="sortBy === 'status'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('created_at')" class="sortable">
+                Criado em
+                <span class="sort-icon" v-if="sortBy === 'created_at'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
               <th class="col-actions">Ações</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="a in assignments" :key="a.id">
+            <tr v-for="a in sortedAssignments" :key="a.id">
               <td><span class="code-pill">{{ a.code }}</span></td>
               <td>{{ a.team?.name }}</td>
               <td>{{ a.evaluator?.name }}</td>
@@ -97,7 +132,7 @@
                 </button>
               </td>
             </tr>
-            <tr v-if="!assignments.length">
+            <tr v-if="!sortedAssignments.length">
               <td colspan="8" class="empty">Nenhuma atribuição cadastrada.</td>
             </tr>
           </tbody>
@@ -111,7 +146,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   assignmentsService,
   teamsService,
@@ -131,6 +166,10 @@ const selectedTeamId = ref('')
 const selectedEvaluatorId = ref('')
 const selectedTemplateId = ref('')
 const error = ref('')
+
+// estado de ordenação
+const sortBy = ref('created_at') // 'code' | 'team' | 'evaluator' | 'template' | 'type' | 'status' | 'created_at'
+const sortDir = ref('desc')
 
 const goToEvaluationDetails = (id) => {
   router.push(`/admin/evaluations/${id}`)
@@ -195,6 +234,61 @@ const copyCode = async (code) => {
 const formatDate = (iso) => {
   return iso ? new Date(iso).toLocaleString('pt-BR') : ''
 }
+
+const setSort = (field) => {
+  if (sortBy.value === field) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortBy.value = field
+    sortDir.value = 'asc'
+  }
+}
+
+const sortedAssignments = computed(() => {
+  const arr = [...assignments.value]
+
+  arr.sort((a, b) => {
+    let fa
+    let fb
+
+    switch (sortBy.value) {
+      case 'team':
+        fa = a.team?.name ?? ''
+        fb = b.team?.name ?? ''
+        break
+      case 'evaluator':
+        fa = a.evaluator?.name ?? ''
+        fb = b.evaluator?.name ?? ''
+        break
+      case 'template':
+        fa = a.template?.name ?? ''
+        fb = b.template?.name ?? ''
+        break
+      case 'type':
+        fa = a.template?.type ?? ''
+        fb = b.template?.type ?? ''
+        break
+      default:
+        fa = a[sortBy.value] ?? ''
+        fb = b[sortBy.value] ?? ''
+    }
+
+    // campo de data
+    if (sortBy.value === 'created_at') {
+      const da = new Date(fa || 0).getTime()
+      const db = new Date(fb || 0).getTime()
+      return sortDir.value === 'asc' ? da - db : db - da
+    }
+
+    const sa = String(fa).toLocaleLowerCase('pt-BR')
+    const sb = String(fb).toLocaleLowerCase('pt-BR')
+    if (sa < sb) return sortDir.value === 'asc' ? -1 : 1
+    if (sa > sb) return sortDir.value === 'asc' ? 1 : -1
+    return 0
+  })
+
+  return arr
+})
 
 onMounted(loadAll)
 </script>
@@ -448,5 +542,20 @@ onMounted(loadAll)
   .card {
     padding: 18px 16px 18px;
   }
+}
+
+.table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.table th.sortable:hover {
+  background-color: #ecf4ee;
+}
+
+.sort-icon {
+  margin-left: 4px;
+  font-size: 11px;
+  color: #78909c;
 }
 </style>

@@ -43,32 +43,44 @@
     <section class="card table-card">
       <div class="table-header">
         <h2>Questões cadastradas</h2>
-        <span class="table-count">{{ questions.length }} questão(ões)</span>
+        <span class="table-count">{{ sortedQuestions.length }} questão(ões)</span>
       </div>
 
       <div class="table-wrapper">
         <table class="table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Pergunta</th>
-              <th>Tipo</th>
+              <!-- removido # -->
+              <th @click="setSort('text')" class="sortable">
+                Pergunta
+                <span class="sort-icon" v-if="sortBy === 'text'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('type')" class="sortable">
+                Tipo
+                <span class="sort-icon" v-if="sortBy === 'type'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
               <th class="col-actions">Ações</th>
             </tr>
           </thead>
+
           <tbody>
-            <tr v-for="(q, index) in questions" :key="q.id">
-              <td>{{ index + 1 }}</td>
+            <tr v-for="q in sortedQuestions" :key="q.id">
+              <!-- primeira coluna some -->
               <td class="col-text">{{ q.text }}</td>
               <td>{{ q.type === 'escala' ? 'Escala 0–5' : 'Aberta' }}</td>
               <td class="col-actions">
                 <button class="btn-danger" @click="deleteQuestion(q.id)">Excluir</button>
               </td>
             </tr>
-            <tr v-if="!questions.length">
-              <td colspan="4" class="empty">Nenhuma questão cadastrada.</td>
+            <tr v-if="!sortedQuestions.length">
+              <td colspan="3" class="empty">Nenhuma questão cadastrada.</td>
             </tr>
           </tbody>
+
         </table>
       </div>
     </section>
@@ -78,12 +90,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { questionsService } from '@/services/supabase.js'
 
 const questions = ref([])
 const newQuestion = ref({ text: '', type: '' })
 const error = ref('')
+
+const sortBy = ref('text') // 'text' | 'type'
+const sortDir = ref('asc')
 
 const loadQuestions = async () => {
   try {
@@ -113,6 +128,31 @@ const deleteQuestion = async (id) => {
     }
   }
 }
+
+const setSort = (field) => {
+  if (sortBy.value === field) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortBy.value = field
+    sortDir.value = 'asc'
+  }
+}
+
+const sortedQuestions = computed(() => {
+  const arr = [...questions.value]
+
+  arr.sort((a, b) => {
+    const fa = a[sortBy.value] ?? ''
+    const fb = b[sortBy.value] ?? ''
+    const sa = String(fa).toLocaleLowerCase('pt-BR')
+    const sb = String(fb).toLocaleLowerCase('pt-BR')
+    if (sa < sb) return sortDir.value === 'asc' ? -1 : 1
+    if (sa > sb) return sortDir.value === 'asc' ? 1 : -1
+    return 0
+  })
+
+  return arr
+})
 
 onMounted(loadQuestions)
 </script>
@@ -258,7 +298,7 @@ onMounted(loadQuestions)
 
 .table-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: space_between;
   align-items: baseline;
   margin-bottom: 10px;
 }
@@ -334,6 +374,21 @@ onMounted(loadQuestions)
   color: #d32f2f;
   font-size: 13px;
   padding-top: 4px;
+}
+
+.table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.table th.sortable:hover {
+  background-color: #ecf4ee;
+}
+
+.sort-icon {
+  margin-left: 4px;
+  font-size: 11px;
+  color: #78909c;
 }
 
 @media (max-width: 900px) {

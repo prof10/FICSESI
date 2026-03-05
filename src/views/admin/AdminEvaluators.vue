@@ -39,21 +39,36 @@
     <section class="card table-card">
       <div class="table-header">
         <h2>Avaliadores cadastrados</h2>
-        <span class="table-count">{{ evaluators.length }} avaliador(es)</span>
+        <span class="table-count">{{ sortedEvaluators.length }} avaliador(es)</span>
       </div>
 
       <div class="table-wrapper">
         <table class="table">
           <thead>
             <tr>
-              <th>Nome</th>
-              <th>E-mail</th>
-              <th>Área de Conhecimento</th>
+              <th @click="setSort('name')" class="sortable">
+                Nome
+                <span class="sort-icon" v-if="sortBy === 'name'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('email')" class="sortable">
+                E-mail
+                <span class="sort-icon" v-if="sortBy === 'email'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('area_conhecimento')" class="sortable">
+                Área de Conhecimento
+                <span class="sort-icon" v-if="sortBy === 'area_conhecimento'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
               <th class="col-actions">Ações</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="ev in evaluators" :key="ev.id">
+            <tr v-for="ev in sortedEvaluators" :key="ev.id">
               <td>{{ ev.name }}</td>
               <td>{{ ev.email }}</td>
               <td>{{ ev.area_conhecimento }}</td>
@@ -61,7 +76,7 @@
                 <button class="btn-danger" @click="deleteEvaluator(ev.id)">Excluir</button>
               </td>
             </tr>
-            <tr v-if="!evaluators.length">
+            <tr v-if="!sortedEvaluators.length">
               <td colspan="4" class="empty">Nenhum avaliador cadastrado.</td>
             </tr>
           </tbody>
@@ -74,7 +89,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { evaluatorsService } from '@/services/supabase.js'
 
 const evaluators = ref([])
@@ -84,6 +99,9 @@ const newEvaluator = ref({
   area_conhecimento: ''
 })
 const error = ref('')
+
+const sortBy = ref('name')
+const sortDir = ref('asc') // 'asc' | 'desc'
 
 const loadEvaluators = async () => {
   try {
@@ -113,6 +131,29 @@ const deleteEvaluator = async (id) => {
     }
   }
 }
+
+const setSort = (field) => {
+  if (sortBy.value === field) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortBy.value = field
+    sortDir.value = 'asc'
+  }
+}
+
+const sortedEvaluators = computed(() => {
+  const arr = [...evaluators.value]
+  arr.sort((a, b) => {
+    const fa = a[sortBy.value] ?? ''
+    const fb = b[sortBy.value] ?? ''
+    const sa = String(fa).toLocaleLowerCase('pt-BR')
+    const sb = String(fb).toLocaleLowerCase('pt-BR')
+    if (sa < sb) return sortDir.value === 'asc' ? -1 : 1
+    if (sa > sb) return sortDir.value === 'asc' ? 1 : -1
+    return 0
+  })
+  return arr
+})
 
 onMounted(loadEvaluators)
 </script>
@@ -305,5 +346,20 @@ onMounted(loadEvaluators)
   .admin-evaluators {
     padding: 20px 14px 28px;
   }
+}
+
+.table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.table th.sortable:hover {
+  background-color: #ecf4ee;
+}
+
+.sort-icon {
+  margin-left: 4px;
+  font-size: 11px;
+  color: #78909c;
 }
 </style>

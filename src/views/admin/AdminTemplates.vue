@@ -44,21 +44,31 @@
     <section class="card table-card">
       <div class="table-header">
         <h2>Modelos cadastrados</h2>
-        <span class="table-count">{{ templates.length }} modelo(s)</span>
+        <span class="table-count">{{ sortedTemplates.length }} modelo(s)</span>
       </div>
 
       <div class="table-wrapper">
         <table class="table">
           <thead>
             <tr>
-              <th>Nome</th>
-              <th>Tipo</th>
+              <th @click="setSort('name')" class="sortable">
+                Nome
+                <span class="sort-icon" v-if="sortBy === 'name'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('type')" class="sortable">
+                Tipo
+                <span class="sort-icon" v-if="sortBy === 'type'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
               <th>Descrição</th>
               <th class="col-actions">Ações</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="tpl in templates" :key="tpl.id">
+            <tr v-for="tpl in sortedTemplates" :key="tpl.id">
               <td>{{ tpl.name }}</td>
               <td>{{ tpl.type === 'online' ? 'Online' : 'Presencial' }}</td>
               <td class="col-desc">{{ tpl.description }}</td>
@@ -71,7 +81,7 @@
                 </button>
               </td>
             </tr>
-            <tr v-if="!templates.length">
+            <tr v-if="!sortedTemplates.length">
               <td colspan="4" class="empty">Nenhum modelo cadastrado.</td>
             </tr>
           </tbody>
@@ -130,7 +140,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   templatesService,
   templateQuestionsService,
@@ -146,6 +156,10 @@ const selectedQuestionIds = ref([])
 
 const error = ref('')
 const saveMessage = ref('')
+
+// ordenação
+const sortBy = ref('name') // 'name' | 'type'
+const sortDir = ref('asc')
 
 const loadTemplates = async () => {
   try {
@@ -211,6 +225,29 @@ const saveQuestions = async () => {
     error.value = 'Erro ao salvar perguntas do modelo: ' + err.message
   }
 }
+
+const setSort = (field) => {
+  if (sortBy.value === field) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortBy.value = field
+    sortDir.value = 'asc'
+  }
+}
+
+const sortedTemplates = computed(() => {
+  const arr = [...templates.value]
+  arr.sort((a, b) => {
+    const fa = a[sortBy.value] ?? ''
+    const fb = b[sortBy.value] ?? ''
+    const sa = String(fa).toLocaleLowerCase('pt-BR')
+    const sb = String(fb).toLocaleLowerCase('pt-BR')
+    if (sa < sb) return sortDir.value === 'asc' ? -1 : 1
+    if (sa > sb) return sortDir.value === 'asc' ? 1 : -1
+    return 0
+  })
+  return arr
+})
 
 onMounted(async () => {
   await Promise.all([loadTemplates(), loadAllQuestions()])
@@ -530,5 +567,20 @@ onMounted(async () => {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+.table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.table th.sortable:hover {
+  background-color: #ecf4ee;
+}
+
+.sort-icon {
+  margin-left: 4px;
+  font-size: 11px;
+  color: #78909c;
 }
 </style>
