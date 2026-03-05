@@ -1,13 +1,13 @@
 <template>
   <div class="evaluator-form">
-    <h2>Avaliação de Equipe</h2>
+    <h2>AVALIAÇÃO DE EQUIPES</h2>
 
     <!-- Passo 1: Digitar código -->
     <form @submit.prevent="handleSearchCode" class="code-form">
       <input
         v-model="code"
         type="text"
-        placeholder="Digite o código da prova"
+        placeholder="Digite o código da avaliação"
         required
       />
       <button type="submit" :disabled="loadingCode">
