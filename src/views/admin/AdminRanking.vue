@@ -10,7 +10,7 @@
 
       <div class="filters">
         <div class="filter-block">
-          <h3>Categorias (premiação)</h3>
+          <h3>Categorias da premiação</h3>
           <div v-for="cat in categories" :key="cat" class="checkbox-item">
             <label>
               <input
@@ -50,7 +50,7 @@
                 v-model="selectedTemplateIds"
                 :value="tpl.id"
               />
-              {{ tpl.name }} ({{ tpl.type === 'online' ? 'Online' : 'Presencial' }})
+              {{ tpl.name }} ({{ tpl.type === 'online' ? 'Virtual' : 'Pitch' }})
             </label>
           </div>
         </div>
@@ -88,8 +88,8 @@
           <thead>
             <tr>
               <th>Posição</th>
-              <th>Equipe</th>
-              <th>Categoria</th>
+              <th>Projeto</th>
+              <th>Categoria da premiação</th>
               <th>Etapa</th>
               <th>Pontuação</th>
             </tr>

@@ -1,17 +1,17 @@
 <template>
   <div class="admin-teams">
     <header class="page-header">
-      <h1>Equipes</h1>
-      <p>Cadastro e gestão das equipes participantes do FICSESI.</p>
+      <h1>Projetos</h1>
+      <p>Cadastro e gestão dos projetos participantes da FICSESI.</p>
     </header>
 
     <section class="card form-card">
-      <h2>Cadastar equipe</h2>
+      <h2>Cadastar Projeto</h2>
 
       <form @submit.prevent="createTeam" class="form-grid">
         <input v-model="newTeam.numero_estande" placeholder="N° Estande" />
 
-        <input v-model="newTeam.name" placeholder="Nome da Equipe" required />
+        <input v-model="newTeam.name" placeholder="Nome do Projeto" required />
 
         <input v-model="newTeam.escola" placeholder="Escola" required />
 
@@ -36,7 +36,7 @@
         </select>
 
         <select v-model="newTeam.category" required>
-          <option value="" disabled>Premiação</option>
+          <option value="" disabled>Categoria da Premiação</option>
           <option value="Educação Infantil">Educação Infantil</option>
           <option value="Anos Iniciais">Anos Iniciais</option>
           <option value="Anos Finais">Anos Finais</option>
@@ -49,14 +49,14 @@
         </select>
 
         <div class="form-actions">
-          <button type="submit">Cadastrar equipe</button>
+          <button type="submit">Cadastrar projeto</button>
         </div>
       </form>
     </section>
 
     <section class="card table-card">
       <div class="table-header">
-        <h2>Equipes cadastradas</h2>
+        <h2>Projetos cadastrados</h2>
         <span class="table-count">{{ sortedTeams.length }} equipe(s)</span>
       </div>
 
@@ -71,7 +71,7 @@
                 </span>
               </th>
               <th @click="setSort('name')" class="sortable">
-                Nome
+                Nome do Projeto
                 <span class="sort-icon" v-if="sortBy === 'name'">
                   {{ sortDir === 'asc' ? '▲' : '▼' }}
                 </span>
@@ -101,7 +101,7 @@
                 </span>
               </th>
               <th @click="setSort('category')" class="sortable">
-                Categoria
+                Categoria da Premiação
                 <span class="sort-icon" v-if="sortBy === 'category'">
                   {{ sortDir === 'asc' ? '▲' : '▼' }}
                 </span>

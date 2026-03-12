@@ -7,7 +7,7 @@
       </header>
 
       <section class="card header-card">
-        <h2>Dados da equipe</h2>
+        <h2>Dados do Projeto</h2>
 
         <div class="info-grid">
           <div>
@@ -21,7 +21,7 @@
           </div>
 
           <div class="wide">
-            <span class="label">Equipe</span>
+            <span class="label">Projeto</span>
             <p class="value">{{ evaluation.team?.name }}</p>
           </div>
 
@@ -94,7 +94,9 @@
             <tbody>
               <tr v-for="(ans, index) in evaluation.answers" :key="index">
                 <td>{{ index + 1 }}</td>
-                <td class="col-question">{{ ans.question?.text }}</td>
+                <td class="col-question">
+                  <span v-html="ans.question?.text"></span>
+                </td>
                 <td>{{ ans.question?.type === 'escala' ? 'Escala 0–5' : 'Aberta' }}</td>
                 <td class="col-answer">
                   <span v-if="ans.question?.type === 'escala'">

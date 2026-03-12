@@ -2,7 +2,7 @@
   <div class="evaluator-page">
     <div class="evaluator-form">
       <header class="page-header">
-        <h1>Avaliação de equipes</h1>
+        <h1>Avaliação de Projetos</h1>
         <p>Informe o código recebido para acessar a ficha de avaliação.</p>
       </header>
 
@@ -25,7 +25,7 @@
 
       <!-- Passo 2: Cabeçalho + formulário -->
       <section v-if="assignment" class="card team-card">
-        <h2>Dados da equipe</h2>
+        <h2>Dados do Projeto</h2>
 
         <div class="team-grid">
           <div>
@@ -34,12 +34,22 @@
           </div>
 
           <div>
+            <span class="label">Avaliador</span>
+            <p class="value">{{ assignment.evaluator?.name }}</p>
+          </div>
+
+          <div>
+            <span class="label">Etapa de ensino</span>
+            <p class="value">{{ assignment.team?.etapa_ensino }}</p>
+          </div>
+
+          <div>
             <span class="label">Nº do estande</span>
             <p class="value">{{ assignment.team?.numero_estande || '—' }}</p>
           </div>
 
           <div class="wide">
-            <span class="label">Equipe</span>
+            <span class="label">Projeto</span>
             <p class="value">{{ assignment.team?.name }}</p>
           </div>
 
@@ -63,7 +73,7 @@
             <p class="value">
               {{ assignment.template?.name }}
               <span class="muted">
-                ({{ assignment.template?.type === 'online' ? 'Online' : 'Presencial' }})
+                ({{ assignment.template?.type === 'online' ? 'Virtual' : 'Pitch' }})
               </span>
             </p>
           </div>
@@ -82,7 +92,7 @@
               class="question-block"
             >
               <p class="question-text">
-                {{ index + 1 }}. {{ item.question.text }}
+                <span v-html="item.question.text"></span>
               </p>
 
               <!-- ESCALA 0–5 com estrelas -->
@@ -181,6 +191,7 @@ const handleSearchCode = async () => {
       code,
       status,
       template_id,
+      evaluator:evaluators ( id, name ),
       template:evaluation_templates ( id, name, type ),
       team:teams (
         id,
@@ -188,7 +199,8 @@ const handleSearchCode = async () => {
         escola,
         cidade,
         numero_estande,
-        area_conhecimento
+        area_conhecimento,
+        etapa_ensino
       )
     `)
     .eq('code', trimmedCode)
@@ -240,6 +252,14 @@ const setStar = (questionId, value) => {
   }
 }
 
+// remove tags HTML para o CSV
+const stripHtml = (html) => {
+  if (!html) return ''
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+  return tmp.textContent || tmp.innerText || ''
+}
+
 const makeCsvAndDownload = () => {
   if (!assignment.value) return
 
@@ -256,12 +276,15 @@ const makeCsvAndDownload = () => {
   const lines = questions.value.map((item, index) => {
     const q = item.question
     const value = answers.value[q.id]
+
+    const plainQuestion = stripHtml(q.text)
+
     return [
       assignment.value.code,
       assignment.value.team?.name,
       assignment.value.team?.escola,
       assignment.value.team?.cidade,
-      `${index + 1}. ${q.text}`,
+      `${index + 1}. ${plainQuestion}`,
       q.type,
       value
     ]
@@ -291,12 +314,38 @@ const makeCsvAndDownload = () => {
 const handleSubmitEvaluation = async () => {
   if (!assignment.value) return
 
-  // valida se todas as respostas foram preenchidas
-  for (const item of questions.value) {
+  // valida respostas: texto em branco e notas 0
+  const zeros = []
+  const vazias = []
+
+  questions.value.forEach((item, index) => {
     const qid = item.question.id
     const value = answers.value[qid]
-    if (value === '' || value === null || value === undefined) {
-      error.value = 'Preencha todas as respostas antes de enviar.'
+
+    if (item.question.type === 'escala') {
+      if (value === 0 || value === '0') {
+        zeros.push(index + 1)
+      }
+    } else {
+      if (value === '' || value === null || value === undefined) {
+        vazias.push(index + 1)
+      }
+    }
+  })
+
+  if (vazias.length || zeros.length) {
+    let msg = ''
+
+    if (vazias.length) {
+      msg += `As questões ${vazias.join(', ')} estão sem resposta.\n`
+    }
+    if (zeros.length) {
+      msg += `As questões ${zeros.join(', ')} estão avaliadas com nota 0.\n`
+    }
+
+    msg += 'Confirme se deseja continuar com esses valores.'
+
+    if (!window.confirm(msg)) {
       return
     }
   }

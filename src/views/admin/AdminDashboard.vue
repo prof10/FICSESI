@@ -7,8 +7,8 @@
 
     <div class="cards">
       <div class="card" @click="go('/admin/teams')">
-        <h3>EQUIPES</h3>
-        <p>Cadastro e gestão das equipes participantes.</p>
+        <h3>PROJETOS</h3>
+        <p>Cadastro e gestão dos projetos participantes.</p>
       </div>
 
       <div class="card" @click="go('/admin/evaluators')">

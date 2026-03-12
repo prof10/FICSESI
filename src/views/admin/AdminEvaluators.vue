@@ -2,7 +2,7 @@
   <div class="admin-evaluators">
     <header class="page-header">
       <h1>Avaliadores</h1>
-      <p>Cadastro e gestão dos avaliadores do FICSESI.</p>
+      <p>Cadastro e gestão dos avaliadores da FICSESI.</p>
     </header>
 
     <section class="card form-card">

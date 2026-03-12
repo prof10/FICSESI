@@ -2,7 +2,7 @@
   <div class="admin-assignments">
     <header class="page-header">
       <h1>Atribuição de avaliações</h1>
-      <p>Vincule equipes, avaliadores e modelos para gerar códigos de avaliação.</p>
+      <p>Vincule projetos, avaliadores e modelos para gerar códigos de avaliação.</p>
     </header>
 
     <section class="card form-card">
@@ -35,7 +35,7 @@
           <select v-model="selectedTemplateId" required>
             <option value="" disabled>Selecione o modelo</option>
             <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">
-              {{ tpl.name }} ({{ tpl.type === 'online' ? 'Online' : 'Presencial' }})
+              {{ tpl.name }} ({{ tpl.type === 'online' ? 'Virtual' : 'Pitch' }})
             </option>
           </select>
         </div>
@@ -63,7 +63,7 @@
                 </span>
               </th>
               <th @click="setSort('team')" class="sortable">
-                Equipe
+                Projeto
                 <span class="sort-icon" v-if="sortBy === 'team'">
                   {{ sortDir === 'asc' ? '▲' : '▼' }}
                 </span>
@@ -107,7 +107,7 @@
               <td>{{ a.team?.name }}</td>
               <td>{{ a.evaluator?.name }}</td>
               <td>{{ a.template?.name }}</td>
-              <td>{{ a.template?.type === 'online' ? 'Online' : 'Presencial' }}</td>
+              <td>{{ a.template?.type === 'online' ? 'Virtual' : 'Pitch' }}</td>
               <td>
                 <span
                   class="status-pill"

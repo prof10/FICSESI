@@ -2,7 +2,7 @@
   <div class="admin-templates">
     <header class="page-header">
       <h1>Avaliações</h1>
-      <p>Modelos de avaliação e vínculo com as questões do FICSESI.</p>
+      <p>Modelos de avaliação e vínculo com as questões da FICSESI.</p>
     </header>
 
     <section class="card form-card">
@@ -13,7 +13,7 @@
           <label class="label">Nome do modelo</label>
           <input
             v-model="newTemplate.name"
-            placeholder="Ex.: Avaliação Online"
+            placeholder="Ex.: Etapa Virtual"
             required
           />
         </div>
@@ -22,8 +22,8 @@
           <label class="label">Tipo</label>
           <select v-model="newTemplate.type" required>
             <option value="" disabled>Selecione</option>
-            <option value="online">Online</option>
-            <option value="presencial">Presencial</option>
+            <option value="online">Virtual</option>
+            <option value="presencial">Pitch</option>
           </select>
         </div>
 
@@ -70,7 +70,7 @@
           <tbody>
             <tr v-for="tpl in sortedTemplates" :key="tpl.id">
               <td>{{ tpl.name }}</td>
-              <td>{{ tpl.type === 'online' ? 'Online' : 'Presencial' }}</td>
+              <td>{{ tpl.type === 'online' ? 'Virtual' : 'Pitch' }}</td>
               <td class="col-desc">{{ tpl.description }}</td>
               <td class="col-actions">
                 <button class="btn-secondary" @click="selectTemplate(tpl)">
@@ -106,23 +106,24 @@
       </p>
 
       <div class="questions-list">
-        <label
-          v-for="q in allQuestions"
-          :key="q.id"
-          class="question-item"
-        >
-          <input
-            type="checkbox"
-            :value="q.id"
-            v-model="selectedQuestionIds"
-          />
-          <div class="question-text">
-            <span class="question-title">{{ q.text }}</span>
-            <span class="question-type">
-              {{ q.type === 'escala' ? 'Escala 0–5' : 'Aberta' }}
-            </span>
-          </div>
-        </label>
+  <label
+    v-for="q in allQuestions"
+    :key="q.id"
+    class="question-item"
+  >
+    <input
+      type="checkbox"
+      :value="q.id"
+      v-model="selectedQuestionIds"
+    />
+    <div class="question-text">
+      <!-- renderiza o HTML vindo do Quill -->
+      <span class="question-title" v-html="q.text"></span>
+      <span class="question-type">
+        {{ q.type === 'escala' ? 'Escala 0–5' : 'Aberta' }}
+      </span>
+    </div>
+  </label>
 
         <p v-if="!allQuestions.length" class="empty">
           Nenhuma pergunta cadastrada. Cadastre questões antes de montar o modelo.

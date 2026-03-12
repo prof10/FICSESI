@@ -2,25 +2,26 @@
   <div class="admin-questions">
     <header class="page-header">
       <h1>Questões</h1>
-      <p>Cadastro das perguntas utilizadas nas avaliações do FICSESI.</p>
+      <p>Cadastro das perguntas utilizadas nas avaliações da FICSESI.</p>
     </header>
 
     <section class="card form-card">
-      <h2>Cadastrar questão</h2>
+      <h2>{{ editingQuestion ? 'Editar questão' : 'Cadastrar questão' }}</h2>
 
-      <form @submit.prevent="createQuestion" class="form-grid">
+      <form @submit.prevent="handleSubmit" class="form-vertical">
         <div class="field-full">
           <label class="label">Texto da pergunta</label>
-          <textarea
-            v-model="newQuestion.text"
-            rows="4"
-            class="textarea"
-            placeholder="Digite o enunciado completo da pergunta"
-            required
-          ></textarea>
+
+          <QuillEditor
+            v-model:content="newQuestion.text"
+            content-type="html"
+            theme="snow"
+            toolbar="full"
+            class="rich-editor"
+          />
         </div>
 
-        <div>
+        <div class="field-type">
           <label class="label">Tipo de pergunta</label>
           <select v-model="newQuestion.type" required>
             <option value="" disabled>Selecione</option>
@@ -30,7 +31,17 @@
         </div>
 
         <div class="form-actions">
-          <button type="submit">Cadastrar questão</button>
+          <button type="submit">
+            {{ editingQuestion ? 'Salvar alterações' : 'Cadastrar questão' }}
+          </button>
+          <button
+            v-if="editingQuestion"
+            type="button"
+            class="btn-cancel"
+            @click="cancelEdit"
+          >
+            Cancelar edição
+          </button>
         </div>
       </form>
 
@@ -50,7 +61,6 @@
         <table class="table">
           <thead>
             <tr>
-              <!-- removido # -->
               <th @click="setSort('text')" class="sortable">
                 Pergunta
                 <span class="sort-icon" v-if="sortBy === 'text'">
@@ -69,10 +79,10 @@
 
           <tbody>
             <tr v-for="q in sortedQuestions" :key="q.id">
-              <!-- primeira coluna some -->
-              <td class="col-text">{{ q.text }}</td>
+              <td class="col-text" v-html="q.text"></td>
               <td>{{ q.type === 'escala' ? 'Escala 0–5' : 'Aberta' }}</td>
               <td class="col-actions">
+                <button class="btn-secondary" @click="startEdit(q)">Editar</button>
                 <button class="btn-danger" @click="deleteQuestion(q.id)">Excluir</button>
               </td>
             </tr>
@@ -80,7 +90,6 @@
               <td colspan="3" class="empty">Nenhuma questão cadastrada.</td>
             </tr>
           </tbody>
-
         </table>
       </div>
     </section>
@@ -91,13 +100,15 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { QuillEditor } from '@vueup/vue-quill'
 import { questionsService } from '@/services/supabase.js'
 
 const questions = ref([])
 const newQuestion = ref({ text: '', type: '' })
+const editingQuestion = ref(null) // guarda a questão sendo editada
 const error = ref('')
 
-const sortBy = ref('text') // 'text' | 'type'
+const sortBy = ref('text')
 const sortDir = ref('asc')
 
 const loadQuestions = async () => {
@@ -108,21 +119,50 @@ const loadQuestions = async () => {
   }
 }
 
+const resetForm = () => {
+  newQuestion.value = { text: '', type: '' }
+  editingQuestion.value = null
+}
+
 const createQuestion = async () => {
+  await questionsService.create(newQuestion.value)
+}
+
+const updateQuestion = async () => {
+  await questionsService.update(editingQuestion.value.id, newQuestion.value)
+}
+
+const handleSubmit = async () => {
   try {
-    await questionsService.create(newQuestion.value)
-    newQuestion.value = { text: '', type: '' }
-    loadQuestions()
+    if (editingQuestion.value) {
+      await updateQuestion()
+    } else {
+      await createQuestion()
+    }
+    resetForm()
+    await loadQuestions()
   } catch (err) {
-    error.value = 'Erro ao cadastrar: ' + err.message
+    error.value = 'Erro ao salvar: ' + err.message
   }
+}
+
+const startEdit = (q) => {
+  editingQuestion.value = q
+  newQuestion.value = { text: q.text, type: q.type }
+}
+
+const cancelEdit = () => {
+  resetForm()
 }
 
 const deleteQuestion = async (id) => {
   if (confirm('Excluir pergunta?')) {
     try {
       await questionsService.delete(id)
-      loadQuestions()
+      if (editingQuestion.value?.id === id) {
+        resetForm()
+      }
+      await loadQuestions()
     } catch (err) {
       error.value = 'Erro ao excluir: ' + err.message
     }
@@ -140,7 +180,6 @@ const setSort = (field) => {
 
 const sortedQuestions = computed(() => {
   const arr = [...questions.value]
-
   arr.sort((a, b) => {
     const fa = a[sortBy.value] ?? ''
     const fb = b[sortBy.value] ?? ''
@@ -150,7 +189,6 @@ const sortedQuestions = computed(() => {
     if (sa > sb) return sortDir.value === 'asc' ? 1 : -1
     return 0
   })
-
   return arr
 })
 
@@ -158,6 +196,8 @@ onMounted(loadQuestions)
 </script>
 
 <style scoped>
+/* seu CSS original + pequenos ajustes para o botão de cancelar */
+
 .admin-questions {
   min-height: 100vh;
   padding: 28px 32px 40px;
@@ -202,16 +242,6 @@ onMounted(loadQuestions)
   text-transform: uppercase;
 }
 
-.form-grid {
-  display: grid;
-  grid-template-columns: 3fr 1fr;
-  gap: 12px 16px;
-}
-
-.field-full {
-  grid-column: 1 / -1;
-}
-
 .label {
   display: block;
   margin-bottom: 4px;
@@ -222,27 +252,37 @@ onMounted(loadQuestions)
   color: #78909c;
 }
 
-.textarea {
-  width: 100%;
-  min-height: 96px;
-  max-height: 220px;
-  padding: 10px 12px;
+.rich-editor {
   border-radius: 16px;
   border: 1px solid #cfd8dc;
-  font-size: 13px;
-  resize: vertical;
-  box-sizing: border-box;
-  outline: none;
-  transition: border-color 0.18s, box-shadow 0.18s;
   background-color: #fdfdfd;
 }
 
-.textarea:focus {
-  border-color: #118c3a;
-  box-shadow: 0 0 0 2px rgba(17, 140, 58, 0.18);
+.rich-editor .ql-toolbar {
+  border-radius: 16px 16px 0 0;
+  border: none;
+  border-bottom: 1px solid #cfd8dc;
 }
 
-.form-grid select {
+.rich-editor .ql-container {
+  border-radius: 0 0 16px 16px;
+  border: none;
+  min-height: 96px;
+  max-height: 220px;
+}
+
+.form-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field-full,
+.field-type {
+  width: 100%;
+}
+
+.form-vertical select {
   padding: 9px 11px;
   border-radius: 999px;
   border: 1px solid #cfd8dc;
@@ -253,15 +293,15 @@ onMounted(loadQuestions)
   transition: border-color 0.18s, box-shadow 0.18s;
 }
 
-.form-grid select:focus {
+.form-vertical select:focus {
   border-color: #118c3a;
   box-shadow: 0 0 0 2px rgba(17, 140, 58, 0.18);
 }
 
 .form-actions {
-  grid-column: 1 / -1;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   margin-top: 6px;
 }
 
@@ -284,6 +324,13 @@ onMounted(loadQuestions)
   background: #02983f;
   transform: translateY(-1px);
   box-shadow: 0 8px 20px rgba(0, 179, 74, 0.45);
+}
+
+.btn-cancel {
+  background: #ffffff;
+  color: #118c3a;
+  box-shadow: none;
+  border: 1px solid rgba(17, 140, 58, 0.25);
 }
 
 .helper {
@@ -346,6 +393,25 @@ onMounted(loadQuestions)
   white-space: nowrap;
 }
 
+.btn-secondary {
+  border: none;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #ffffff;
+  color: #118c3a;
+  border: 1px solid rgba(17, 140, 58, 0.25);
+  margin-right: 6px;
+  transition: background 0.18s, color 0.18s, transform 0.18s;
+}
+
+.btn-secondary:hover {
+  background: #118c3a;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
 .btn-danger {
   border: none;
   border-radius: 999px;
@@ -394,10 +460,6 @@ onMounted(loadQuestions)
 @media (max-width: 900px) {
   .admin-questions {
     padding: 20px 14px 28px;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
   }
 
   .card {
