@@ -116,6 +116,17 @@ export const assignmentsService = {
   async delete(id) {
     const { error } = await supabase.from('assignments').delete().eq('id', id)
     if (error) throw error
+  },
+
+  // ✅ NOVO MÉTODO - EXCLUI RESPOSTAS DA TABELA evaluation_answers
+  async deleteResponsesByAssignment(assignmentId) {
+    const { data, error } = await supabase
+      .from('evaluation_answers')
+      .delete()
+      .eq('assignment_id', assignmentId)
+
+    if (error) throw error
+    return data
   }
 }
 

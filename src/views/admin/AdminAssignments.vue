@@ -41,7 +41,9 @@
         </div>
 
         <div class="form-actions">
-          <button type="submit">Gerar código</button>
+          <button type="submit" :disabled="isLoading">
+            {{ isLoading ? 'Gerando...' : 'Gerar código' }}
+          </button>
         </div>
       </form>
     </section>
@@ -127,8 +129,12 @@
                 <button class="btn-secondary" @click="goToEvaluationDetails(a.id)">
                   Ver respostas
                 </button>
-                <button class="btn-danger" @click="deleteAssignment(a.id)">
-                  Excluir
+                <button 
+                  class="btn-danger" 
+                  @click="deleteAssignment(a.id)"
+                  :disabled="isDeleting"
+                >
+                  {{ isDeleting ? 'Excluindo...' : 'Excluir' }}
                 </button>
               </td>
             </tr>
@@ -166,9 +172,11 @@ const selectedTeamId = ref('')
 const selectedEvaluatorId = ref('')
 const selectedTemplateId = ref('')
 const error = ref('')
+const isLoading = ref(false)
+const isDeleting = ref(false)
 
 // estado de ordenação
-const sortBy = ref('created_at') // 'code' | 'team' | 'evaluator' | 'template' | 'type' | 'status' | 'created_at'
+const sortBy = ref('created_at')
 const sortDir = ref('desc')
 
 const goToEvaluationDetails = (id) => {
@@ -187,6 +195,7 @@ const loadAll = async () => {
 }
 
 const createAssignment = async () => {
+  isLoading.value = true
   try {
     const team = teams.value.find((t) => t.id === selectedTeamId.value)
     if (!team) throw new Error('Equipe não encontrada')
@@ -208,16 +217,33 @@ const createAssignment = async () => {
     await loadAll()
   } catch (err) {
     error.value = 'Erro ao criar atribuição: ' + err.message
+  } finally {
+    isLoading.value = false
   }
 }
 
 const deleteAssignment = async (id) => {
-  if (confirm('Excluir atribuição?')) {
+  if (confirm('Excluir atribuição? Esta ação não pode ser desfeita.')) {
+    isDeleting.value = true
     try {
+      // Buscar a atribuição para verificar o status
+      const assignment = assignments.value.find(a => a.id === id)
+      if (!assignment) {
+        throw new Error('Atribuição não encontrada')
+      }
+
+      // Se status é 'respondido', excluir respostas da tabela evaluation_answers primeiro
+      if (assignment.status === 'respondido') {
+        await assignmentsService.deleteResponsesByAssignment(id)
+      }
+
+      // Depois excluir a atribuição
       await assignmentsService.delete(id)
       await loadAll()
     } catch (err) {
       error.value = 'Erro ao excluir atribuição: ' + err.message
+    } finally {
+      isDeleting.value = false
     }
   }
 }
