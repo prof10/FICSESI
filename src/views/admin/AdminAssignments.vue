@@ -223,30 +223,20 @@ const createAssignment = async () => {
 }
 
 const deleteAssignment = async (id) => {
-  if (confirm('Excluir atribuição? Esta ação não pode ser desfeita.')) {
+  if (confirm('Excluir atribuição? Esta ação não pode ser desfeita.\n\n✅ Respostas e pontuações serão removidas automaticamente.')) {
     isDeleting.value = true
     try {
-      // Buscar a atribuição para verificar o status
-      const assignment = assignments.value.find(a => a.id === id)
-      if (!assignment) {
-        throw new Error('Atribuição não encontrada')
-      }
-
-      // Se status é 'respondido', excluir respostas da tabela evaluation_answers primeiro
-      if (assignment.status === 'respondido') {
-        await assignmentsService.deleteResponsesByAssignment(id)
-      }
-
-      // Depois excluir a atribuição
-      await assignmentsService.delete(id)
+      await assignmentsService.delete(id)  // TRIGGER faz o resto!
       await loadAll()
+      alert('✅ Atribuição excluída com sucesso!')
     } catch (err) {
-      error.value = 'Erro ao excluir atribuição: ' + err.message
+      error.value = 'Erro ao excluir: ' + err.message
     } finally {
       isDeleting.value = false
     }
   }
 }
+
 
 const copyCode = async (code) => {
   try {
