@@ -178,6 +178,12 @@ const loadRanking = async () => {
   loading.value = true
 
   try {
+    console.log('🔍 Filtros:', {
+      categories: selectedCategories.value,
+      etapas: selectedEtapas.value,
+      templates: selectedTemplateIds.value
+    })
+
     if (
       !selectedCategories.value.length ||
       !selectedEtapas.value.length ||
@@ -187,39 +193,67 @@ const loadRanking = async () => {
       return
     }
 
+    // Query da VIEW
     const { data, error: rankError } = await supabase
-      .from('team_scores')
-      .select(
-        'team_id, team_name, category, etapa_ensino, template_id, total_score'
-      )
+      .from('team_template_averages')
+      .select('team_id, team_name, category, etapa_ensino, template_id, avg_score, evaluator_count')
       .in('category', selectedCategories.value)
       .in('etapa_ensino', selectedEtapas.value)
       .in('template_id', selectedTemplateIds.value)
-      .order('total_score', { ascending: false })
+      .order('avg_score', { ascending: false })
+
+    console.log('📊 DADOS BRUTOS DA VIEW:', data)
+    console.log('❌ Erro query?', rankError)
 
     if (rankError) {
       error.value = 'Erro ao carregar ranking.'
+      console.error('Erro completo:', rankError)
+      return
+    }
+
+    if (!data || data.length === 0) {
+      console.log('⚠️ Nenhum dado retornado')
+      ranking.value = []
       return
     }
 
     const byTeam = new Map()
 
-    for (const row of data || []) {
+    for (const row of data) {
+      console.log('🔢 Linha:', {
+        team: row.team_name,
+        template: row.template_id,
+        avg: row.avg_score,
+        avaliadores: row.evaluator_count
+      })
+      
       const existing = byTeam.get(row.team_id)
       if (existing) {
-        existing.total_score += row.total_score
+        existing.total_score += row.avg_score
+        console.log('➕ Já existia, novo total:', existing.total_score)
       } else {
-        byTeam.set(row.team_id, { ...row })
+        byTeam.set(row.team_id, { 
+          ...row, 
+          total_score: row.avg_score 
+        })
+        console.log('🆕 Novo time, score inicial:', row.avg_score)
       }
     }
 
-    ranking.value = Array.from(byTeam.values()).sort(
-      (a, b) => b.total_score - a.total_score
-    )
+    const finalRanking = Array.from(byTeam.values()).sort((a, b) => b.total_score - a.total_score)
+    console.log('🏁 RANKING FINAL:', finalRanking)
+    
+    ranking.value = finalRanking
+
+  } catch (err) {
+    console.error('💥 Erro geral:', err)
+    error.value = 'Erro inesperado.'
   } finally {
     loading.value = false
   }
 }
+
+
 
 onMounted(loadFilters)
 </script>
