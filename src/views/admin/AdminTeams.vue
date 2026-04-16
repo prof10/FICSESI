@@ -78,7 +78,7 @@
       <div class="import-preview">
         <div class="preview-header">
           <span>
-            {{ csvData.length ? `✅ ${csvData.length} projetos prontos` : 'Nenhum projeto pronto ainda' }}
+            {{ csvData.length ? `✅ ${csvData.length} projetos prontos` : 'Pré-visualização dos Projetos' }}
           </span>
 
           <button
