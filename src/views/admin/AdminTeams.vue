@@ -6,7 +6,7 @@
     </header>
 
     <section class="card form-card">
-      <h2>Cadastar Projeto</h2>
+      <h2>Cadastrar Projeto</h2>
 
       <form @submit.prevent="createTeam" class="form-grid">
         <input v-model="newTeam.numero_estande" placeholder="N° Estande" />
@@ -54,56 +54,63 @@
       </form>
     </section>
 
-    <!-- 📥 IMPORT CSV - COLE AQUI -->
-<section class="card import-card">
-  
-  
-  <div class="import-options">
-    <!-- Opção 1: Textarea CSV -->
-    <div class="csv-paste">
-      <label>Cole o CSV aqui:</label>
-      <textarea 
-        v-model="csvText" 
-        rows="6" 
-        placeholder="numero_estande;name;escola;cidade;area_conhecimento;etapa_ensino;category
-001;Robô Solar;SESI 101;Curitiba;Engenharias;Ensino Médio;Engenharias"
-        @input="parseCsvText"
-      ></textarea>
-    </div>
-    
-    
-   
-  </div>
-  
-  <!-- Preview + Importar -->
-  <div v-if="csvData.length" class="import-preview">
-    <div class="preview-header">
-      <span>✅ {{ csvData.length }} projetos prontos</span>
-      <button @click="importTeams" class="import-btn" :disabled="importing">
-        {{ importing ? 'Importando...' : 'IMPORTAR AGORA' }}
-      </button>
-    </div>
-    <div class="preview-table">
-      <table>
-        <thead>
-          <tr>
-            <th>Estande</th>
-            <th>Projeto</th>
-            <th>Escola</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(row, i) in csvData.slice(0,3)" :key="i">
-            <td>{{ row.numero_estande }}</td>
-            <td>{{ row.name?.slice(0,20) }}</td>
-            <td>{{ row.escola }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
+    <section class="card import-card">
+      <h2>Importar Projetos</h2>
 
+      <p class="helper">
+        Você pode importar arquivos .xlsx, .xls ou .csv com os campos:
+        Número do Estande; Projeto; Escola; Cidade; Área de Conhecimento; Etapa; Categoria para Premiação
+      </p>
+
+      <div class="import-options">
+        <div class="file-import">
+          <label for="spreadsheet-file">Importar projetos por Excel ou CSV:</label>
+          <input
+            id="spreadsheet-file"
+            ref="fileInput"
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            @change="handleFile"
+          />
+        </div>
+      </div>
+
+      <div class="import-preview">
+        <div class="preview-header">
+          <span>
+            {{ csvData.length ? `✅ ${csvData.length} projetos prontos` : 'Nenhum projeto pronto ainda' }}
+          </span>
+
+          <button
+            type="button"
+            @click="importTeams"
+            class="import-btn"
+            :disabled="!csvData.length || importing"
+          >
+            {{ importing ? 'Importando...' : 'IMPORTAR AGORA' }}
+          </button>
+        </div>
+
+        <div v-if="csvData.length" class="preview-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Estande</th>
+                <th>Projeto</th>
+                <th>Escola</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, i) in csvData.slice(0, 5)" :key="i">
+                <td>{{ row.numero_estande }}</td>
+                <td>{{ row.name?.slice(0, 30) }}</td>
+                <td>{{ row.escola }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
     <section class="card table-card">
       <div class="table-header">
@@ -187,9 +194,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import * as XLSX from 'xlsx'
 import { teamsService } from '@/services/supabase.js'
 
 const teams = ref([])
+
 const newTeam = ref({
   numero_estande: '',
   name: '',
@@ -199,10 +208,8 @@ const newTeam = ref({
   category: '',
   etapa_ensino: ''
 })
-const error = ref('')
 
-// 👇 NOVO: IMPORT
-const csvText = ref('')
+const error = ref('')
 const csvData = ref([])
 const fileInput = ref(null)
 const importing = ref(false)
@@ -210,41 +217,151 @@ const importing = ref(false)
 const sortBy = ref('name')
 const sortDir = ref('asc')
 
-// Parse CSV texto ou arquivo
-const parseCsvText = () => {
-  if (!csvText.value.trim()) {
-    csvData.value = []
-    return
-  }
-  const lines = csvText.value.split('\n').filter(l => l.trim())
-  const headers = lines[0].split(';').map(h => h.trim().toLowerCase())
-  
-  csvData.value = lines.slice(1)
-    .map(line => {
-      const values = line.split(';').map(v => v.trim().replace(/"/g, ''))
-      const row = {}
-      headers.forEach((h, i) => row[h] = values[i] || '')
-      return row
+const headerMap = {
+  'numero do estande': 'numero_estande',
+  'número do estande': 'numero_estande',
+  'numero_estande': 'numero_estande',
+
+  'projeto': 'name',
+  'name': 'name',
+
+  'escola': 'escola',
+
+  'cidade': 'cidade',
+
+  'area de conhecimento': 'area_conhecimento',
+  'área de conhecimento': 'area_conhecimento',
+  'area_conhecimento': 'area_conhecimento',
+
+  'etapa': 'etapa_ensino',
+  'etapa_ensino': 'etapa_ensino',
+
+  'categoria para premiacao': 'category',
+  'categoria para premiação': 'category',
+  'category': 'category'
+}
+
+const normalizeHeader = (text = '') => {
+  return text
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+const mapRowsToInternalFields = (rows) => {
+  const parsed = rows
+    .map((row) => {
+      const mapped = {
+        numero_estande: '',
+        name: '',
+        escola: '',
+        cidade: '',
+        area_conhecimento: '',
+        etapa_ensino: '',
+        category: ''
+      }
+
+      Object.entries(row).forEach(([key, value]) => {
+        const normalizedKey = normalizeHeader(key)
+        const internalField = headerMap[normalizedKey]
+
+        if (!internalField) return
+
+        mapped[internalField] = value?.toString().trim() || ''
+      })
+
+      return mapped
     })
     .filter(row => row.name && row.escola)
+
+  return parsed
+}
+
+const validateHeaders = (rows) => {
+  if (!rows.length) {
+    error.value = 'A planilha/arquivo não possui linhas para importar.'
+    return false
+  }
+
+  const firstRowKeys = Object.keys(rows[0]).map(normalizeHeader)
+
+  const hasProjeto = firstRowKeys.some(key => headerMap[key] === 'name')
+  const hasEscola = firstRowKeys.some(key => headerMap[key] === 'escola')
+
+  if (!hasProjeto || !hasEscola) {
+    error.value =
+      'Cabeçalho inválido. Use colunas como: Número do Estande, Projeto, Escola, Cidade, Área de Conhecimento, Etapa, Categoria para Premiação.'
+    return false
+  }
+
+  return true
+}
+
+const parseCsvFile = async (file) => {
+  const text = await file.text()
+
+  const workbook = XLSX.read(text, { type: 'string', FS: ';' })
+  const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+
+  return XLSX.utils.sheet_to_json(firstSheet, {
+    defval: '',
+    raw: false
+  })
+}
+
+const parseExcelFile = async (file) => {
+  const ab = await file.arrayBuffer()
+  const workbook = XLSX.read(ab)
+  const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+
+  return XLSX.utils.sheet_to_json(firstSheet, {
+    defval: '',
+    raw: false
+  })
 }
 
 const handleFile = async (e) => {
-  const file = e.target.files[0]
+  error.value = ''
+  csvData.value = []
+
+  const file = e.target.files?.[0]
   if (!file) return
-  
-  if (file.name.endsWith('.csv')) {
-    const text = await file.text()
-    csvText.value = text
-    parseCsvText()
+
+  const fileName = file.name.toLowerCase()
+
+  try {
+    let rows = []
+
+    if (fileName.endsWith('.csv')) {
+      rows = await parseCsvFile(file)
+    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      rows = await parseExcelFile(file)
+    } else {
+      error.value = 'Selecione um arquivo .xlsx, .xls ou .csv.'
+      return
+    }
+
+    if (!validateHeaders(rows)) return
+
+    csvData.value = mapRowsToInternalFields(rows)
+
+    if (!csvData.value.length) {
+      error.value = 'Nenhuma linha válida encontrada para importar.'
+    }
+  } catch (err) {
+    error.value = 'Erro ao ler arquivo: ' + err.message
   }
-  // Excel futuramente
 }
 
 const importTeams = async () => {
+  if (!csvData.value.length) return
+
   importing.value = true
+  error.value = ''
   let successCount = 0
-  
+
   try {
     for (const row of csvData.value) {
       await teamsService.create({
@@ -258,19 +375,22 @@ const importTeams = async () => {
       })
       successCount++
     }
-    
-    csvText.value = ''
+
     csvData.value = []
+
+    if (fileInput.value) {
+      fileInput.value.value = ''
+    }
+
     await loadTeams()
     alert(`✅ ${successCount} projetos importados!`)
   } catch (err) {
-    error.value = 'Erro: ' + err.message
+    error.value = 'Erro ao importar: ' + err.message
   } finally {
     importing.value = false
   }
 }
 
-// Resto igual...
 const loadTeams = async () => {
   try {
     teams.value = await teamsService.getAll()
@@ -282,8 +402,16 @@ const loadTeams = async () => {
 const createTeam = async () => {
   try {
     await teamsService.create(newTeam.value)
-    newTeam.value = { numero_estande: '', name: '', escola: '', cidade: '', area_conhecimento: '', category: '', etapa_ensino: '' }
-    loadTeams()
+    newTeam.value = {
+      numero_estande: '',
+      name: '',
+      escola: '',
+      cidade: '',
+      area_conhecimento: '',
+      category: '',
+      etapa_ensino: ''
+    }
+    await loadTeams()
   } catch (err) {
     error.value = 'Erro ao cadastrar: ' + err.message
   }
@@ -293,7 +421,7 @@ const deleteTeam = async (id) => {
   if (confirm('Excluir equipe?')) {
     try {
       await teamsService.delete(id)
-      loadTeams()
+      await loadTeams()
     } catch (err) {
       error.value = 'Erro ao excluir: ' + err.message
     }
@@ -311,26 +439,30 @@ const setSort = (field) => {
 
 const sortedTeams = computed(() => {
   const arr = [...teams.value]
+
   arr.sort((a, b) => {
     const fa = a[sortBy.value] ?? ''
     const fb = b[sortBy.value] ?? ''
+
     if (sortBy.value === 'numero_estande') {
       const na = Number(fa) || 0
       const nb = Number(fb) || 0
       return sortDir.value === 'asc' ? na - nb : nb - na
     }
+
     const sa = String(fa).toLocaleLowerCase('pt-BR')
     const sb = String(fb).toLocaleLowerCase('pt-BR')
+
     if (sa < sb) return sortDir.value === 'asc' ? -1 : 1
     if (sa > sb) return sortDir.value === 'asc' ? 1 : -1
     return 0
   })
+
   return arr
 })
 
 onMounted(loadTeams)
 </script>
-
 
 <style scoped>
 .admin-teams {
@@ -359,7 +491,6 @@ onMounted(loadTeams)
   color: #546e7a;
 }
 
-/* TODOS OS CARDS */
 .card {
   max-width: 1080px;
   margin: 0 auto 20px;
@@ -379,7 +510,6 @@ onMounted(loadTeams)
   text-transform: uppercase;
 }
 
-/* IMPORT CARD VERDE */
 .import-card {
   background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%);
   border: 2px dashed #81c784 !important;
@@ -438,7 +568,6 @@ onMounted(loadTeams)
   box-shadow: 0 8px 20px rgba(0, 179, 74, 0.45);
 }
 
-/* TABELA */
 .table-card {
   overflow: hidden;
 }
@@ -518,7 +647,6 @@ onMounted(loadTeams)
   padding-top: 4px;
 }
 
-/* RESPONSIVO */
 @media (max-width: 900px) {
   .form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -529,11 +657,19 @@ onMounted(loadTeams)
   .admin-teams {
     padding: 20px 14px 28px;
   }
+
   .form-grid {
     grid-template-columns: 1fr;
   }
+
   .card {
     padding: 18px 16px 18px;
+  }
+
+  .preview-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
   }
 }
 
@@ -552,7 +688,6 @@ onMounted(loadTeams)
   color: #78909c;
 }
 
-/* 🔥 IMPORT CSV PERFEITO */
 .helper {
   color: #118c3a;
   font-size: 14px;
@@ -567,14 +702,11 @@ onMounted(loadTeams)
 
 .import-options {
   margin: 0;
+  display: grid;
+  gap: 16px;
 }
 
-.csv-paste {
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.csv-paste label {
+.file-import label {
   font-weight: 600;
   color: #2e7d32;
   margin-bottom: 12px;
@@ -582,32 +714,20 @@ onMounted(loadTeams)
   letter-spacing: 0.3px;
 }
 
-.csv-paste textarea {
+.file-import input {
   width: 100%;
-  height: 160px;
-  padding: 14px;
-  margin: 0;
-  box-sizing: border-box;
+  padding: 12px 14px;
   border: 2px solid #c8e6c9;
   border-radius: 12px;
-  font-family: 'Monaco', 'Menlo', monospace;
-  font-size: 13px;
-  resize: vertical;
-  background: linear-gradient(135deg, #f9fcf9 0%, #fafaf5 100%);
+  background: #fff;
   color: #2e7d32;
-  line-height: 1.5;
-  transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 
-.csv-paste textarea:focus {
+.file-import input:focus {
   border-color: #4caf50;
   box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
   outline: none;
-}
-
-.csv-paste textarea::placeholder {
-  color: #81c784;
-  font-style: italic;
 }
 
 .import-preview {
@@ -624,6 +744,7 @@ onMounted(loadTeams)
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  gap: 12px;
 }
 
 .preview-header span {
@@ -673,7 +794,7 @@ onMounted(loadTeams)
   background: white;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   border-collapse: collapse;
 }
 
@@ -698,4 +819,3 @@ onMounted(loadTeams)
   background: rgba(129, 199, 132, 0.1);
 }
 </style>
-
