@@ -7,16 +7,11 @@
 
     <section class="card form-card">
       <h2>Cadastrar Projeto</h2>
-
       <form @submit.prevent="createTeam" class="form-grid">
         <input v-model="newTeam.numero_estande" placeholder="N° Estande" />
-
-        <input v-model="newTeam.name" placeholder="Nome do Projeto" required />
-
+        <input v-model="newTeam.name" placeholder="Nome do Artigo" required />
         <input v-model="newTeam.escola" placeholder="Escola" required />
-
         <input v-model="newTeam.cidade" placeholder="Cidade" required />
-
         <select v-model="newTeam.area_conhecimento" required>
           <option value="" disabled>Área de Conhecimento</option>
           <option value="Ciências Humanas e Sociais">Ciências Humanas e Sociais</option>
@@ -24,7 +19,6 @@
           <option value="Engenharias">Engenharias</option>
           <option value="Empreendedorismo">Empreendedorismo</option>
         </select>
-
         <select v-model="newTeam.etapa_ensino" required>
           <option value="" disabled>Etapa de Ensino</option>
           <option value="Educação Infantil">Educação Infantil</option>
@@ -34,7 +28,6 @@
           <option value="Anos Finais EJA">Anos Finais - EJA</option>
           <option value="Ensino Médio EJA">Ensino Médio - EJA</option>
         </select>
-
         <select v-model="newTeam.category" required>
           <option value="" disabled>Categoria da Premiação</option>
           <option value="Educação Infantil">Educação Infantil</option>
@@ -47,7 +40,6 @@
           <option value="Mentes Criativas">Mentes Criativas</option>
           <option value="EJA">EJA</option>
         </select>
-
         <div class="form-actions">
           <button type="submit">Cadastrar projeto</button>
         </div>
@@ -58,8 +50,8 @@
       <h2>Importar Projetos</h2>
 
       <p class="helper">
-        Você pode importar arquivos .xlsx, .xls ou .csv com os campos:
-        Número do Estande; Projeto; Escola; Cidade; Área de Conhecimento; Etapa; Categoria para Premiação
+        Você pode importar arquivos .xlsx, .xls ou .csv com os campos na ordem:<br />
+        <strong>N° Estande; Categoria da Premiação; Área de Conhecimento; Cidade; Nome do Artigo; Etapa de Ensino; Escola</strong>
       </p>
 
       <div class="import-options">
@@ -80,7 +72,6 @@
           <span>
             {{ csvData.length ? `✅ ${csvData.length} projetos prontos` : 'Pré-visualização dos Projetos' }}
           </span>
-
           <button
             type="button"
             @click="importTeams"
@@ -96,7 +87,7 @@
             <thead>
               <tr>
                 <th>Estande</th>
-                <th>Projeto</th>
+                <th>Nome do Artigo</th>
                 <th>Escola</th>
               </tr>
             </thead>
@@ -128,21 +119,9 @@
                   {{ sortDir === 'asc' ? '▲' : '▼' }}
                 </span>
               </th>
-              <th @click="setSort('name')" class="sortable">
-                Nome do Projeto
-                <span class="sort-icon" v-if="sortBy === 'name'">
-                  {{ sortDir === 'asc' ? '▲' : '▼' }}
-                </span>
-              </th>
-              <th @click="setSort('escola')" class="sortable">
-                Escola
-                <span class="sort-icon" v-if="sortBy === 'escola'">
-                  {{ sortDir === 'asc' ? '▲' : '▼' }}
-                </span>
-              </th>
-              <th @click="setSort('cidade')" class="sortable">
-                Cidade
-                <span class="sort-icon" v-if="sortBy === 'cidade'">
+              <th @click="setSort('category')" class="sortable">
+                Categoria da Premiação
+                <span class="sort-icon" v-if="sortBy === 'category'">
                   {{ sortDir === 'asc' ? '▲' : '▼' }}
                 </span>
               </th>
@@ -152,15 +131,27 @@
                   {{ sortDir === 'asc' ? '▲' : '▼' }}
                 </span>
               </th>
+              <th @click="setSort('cidade')" class="sortable">
+                Cidade
+                <span class="sort-icon" v-if="sortBy === 'cidade'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
+              <th @click="setSort('name')" class="sortable">
+                Nome do Artigo
+                <span class="sort-icon" v-if="sortBy === 'name'">
+                  {{ sortDir === 'asc' ? '▲' : '▼' }}
+                </span>
+              </th>
               <th @click="setSort('etapa_ensino')" class="sortable">
                 Etapa de Ensino
                 <span class="sort-icon" v-if="sortBy === 'etapa_ensino'">
                   {{ sortDir === 'asc' ? '▲' : '▼' }}
                 </span>
               </th>
-              <th @click="setSort('category')" class="sortable">
-                Categoria da Premiação
-                <span class="sort-icon" v-if="sortBy === 'category'">
+              <th @click="setSort('escola')" class="sortable">
+                Escola
+                <span class="sort-icon" v-if="sortBy === 'escola'">
                   {{ sortDir === 'asc' ? '▲' : '▼' }}
                 </span>
               </th>
@@ -170,12 +161,12 @@
           <tbody>
             <tr v-for="team in sortedTeams" :key="team.id">
               <td>{{ team.numero_estande }}</td>
-              <td>{{ team.name }}</td>
-              <td>{{ team.escola }}</td>
-              <td>{{ team.cidade }}</td>
-              <td>{{ team.area_conhecimento }}</td>
-              <td>{{ team.etapa_ensino }}</td>
               <td>{{ team.category }}</td>
+              <td>{{ team.area_conhecimento }}</td>
+              <td>{{ team.cidade }}</td>
+              <td>{{ team.name }}</td>
+              <td>{{ team.etapa_ensino }}</td>
+              <td>{{ team.escola }}</td>
               <td class="col-actions">
                 <button class="btn-danger" @click="deleteTeam(team.id)">Excluir</button>
               </td>
@@ -214,31 +205,47 @@ const csvData = ref([])
 const fileInput = ref(null)
 const importing = ref(false)
 
-const sortBy = ref('name')
+const sortBy = ref('numero_estande')
 const sortDir = ref('asc')
 
 const headerMap = {
-  'numero do estande': 'numero_estande',
-  'número do estande': 'numero_estande',
-  'numero_estande': 'numero_estande',
+  // N° ESTANDE
+  'n estande':             'numero_estande',
+  'n° estande':            'numero_estande',
+  'no estande':            'numero_estande',
+  'numero estande':        'numero_estande',
+  'número estande':        'numero_estande',
+  'numero do estande':     'numero_estande',
+  'número do estande':     'numero_estande',
+  'numero_estande':        'numero_estande',
 
-  'projeto': 'name',
-  'name': 'name',
-
-  'escola': 'escola',
-
-  'cidade': 'cidade',
-
-  'area de conhecimento': 'area_conhecimento',
-  'área de conhecimento': 'area_conhecimento',
-  'area_conhecimento': 'area_conhecimento',
-
-  'etapa': 'etapa_ensino',
-  'etapa_ensino': 'etapa_ensino',
-
+  // CATEGORIA DA PREMIAÇÃO
+  'categoria da premiacao':  'category',
+  'categoria da premiação':  'category',
   'categoria para premiacao': 'category',
   'categoria para premiação': 'category',
-  'category': 'category'
+  'category':                'category',
+
+  // ÁREA DE CONHECIMENTO
+  'area de conhecimento':  'area_conhecimento',
+  'área de conhecimento':  'area_conhecimento',
+  'area_conhecimento':     'area_conhecimento',
+
+  // CIDADE
+  'cidade': 'cidade',
+
+  // NOME DO ARTIGO
+  'nome do artigo': 'name',
+  'projeto':        'name',
+  'name':           'name',
+
+  // ETAPA DE ENSINO
+  'etapa de ensino': 'etapa_ensino',
+  'etapa':           'etapa_ensino',
+  'etapa_ensino':    'etapa_ensino',
+
+  // ESCOLA
+  'escola': 'escola',
 }
 
 const normalizeHeader = (text = '') => {
@@ -287,12 +294,12 @@ const validateHeaders = (rows) => {
 
   const firstRowKeys = Object.keys(rows[0]).map(normalizeHeader)
 
-  const hasProjeto = firstRowKeys.some(key => headerMap[key] === 'name')
+  const hasArtigo = firstRowKeys.some(key => headerMap[key] === 'name')
   const hasEscola = firstRowKeys.some(key => headerMap[key] === 'escola')
 
-  if (!hasProjeto || !hasEscola) {
+  if (!hasArtigo || !hasEscola) {
     error.value =
-      'Cabeçalho inválido. Use colunas como: Número do Estande, Projeto, Escola, Cidade, Área de Conhecimento, Etapa, Categoria para Premiação.'
+      'Cabeçalho inválido. Use colunas como: N° Estande; Categoria da Premiação; Área de Conhecimento; Cidade; Nome do Artigo; Etapa de Ensino; Escola.'
     return false
   }
 
@@ -301,25 +308,16 @@ const validateHeaders = (rows) => {
 
 const parseCsvFile = async (file) => {
   const text = await file.text()
-
   const workbook = XLSX.read(text, { type: 'string', FS: ';' })
   const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-
-  return XLSX.utils.sheet_to_json(firstSheet, {
-    defval: '',
-    raw: false
-  })
+  return XLSX.utils.sheet_to_json(firstSheet, { defval: '', raw: false })
 }
 
 const parseExcelFile = async (file) => {
   const ab = await file.arrayBuffer()
   const workbook = XLSX.read(ab)
   const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-
-  return XLSX.utils.sheet_to_json(firstSheet, {
-    defval: '',
-    raw: false
-  })
+  return XLSX.utils.sheet_to_json(firstSheet, { defval: '', raw: false })
 }
 
 const handleFile = async (e) => {
@@ -365,13 +363,13 @@ const importTeams = async () => {
   try {
     for (const row of csvData.value) {
       await teamsService.create({
-        numero_estande: row.numero_estande || '',
-        name: row.name || '',
-        escola: row.escola || '',
-        cidade: row.cidade || '',
+        numero_estande:    row.numero_estande || '',
+        name:              row.name || '',
+        escola:            row.escola || '',
+        cidade:            row.cidade || '',
         area_conhecimento: row.area_conhecimento || '',
-        etapa_ensino: row.etapa_ensino || '',
-        category: row.category || ''
+        etapa_ensino:      row.etapa_ensino || '',
+        category:          row.category || ''
       })
       successCount++
     }
