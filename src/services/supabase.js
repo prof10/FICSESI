@@ -78,7 +78,6 @@ export const questionsService = {
   }
 }
 
-// helper para códigos aleatórios
 export function generateRandomCode(length = 8) {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
   let result = ''
@@ -94,7 +93,8 @@ export const assignmentsService = {
       .from('assignments')
       .select(`
         id, code, status, created_at,
-        team:teams ( id, name, escola, cidade, numero_estande ),
+        team_id,
+        team:teams ( id, name, escola, cidade, numero_estande, category, area_conhecimento ),
         evaluator:evaluators ( id, name, email, area_conhecimento ),
         template:evaluation_templates ( id, name, type )
       `)
@@ -103,7 +103,6 @@ export const assignmentsService = {
     return data || []
   },
 
-  // aqui o code já vem pronto (ex: "A12-3f9a7cde")
   async create(assignment) {
     const { data, error } = await supabase
       .from('assignments')
@@ -118,19 +117,16 @@ export const assignmentsService = {
     if (error) throw error
   },
 
-  // ✅ NOVO MÉTODO - EXCLUI RESPOSTAS DA TABELA evaluation_answers
   async deleteResponsesByAssignment(assignmentId) {
     const { data, error } = await supabase
       .from('evaluation_answers')
       .delete()
       .eq('assignment_id', assignmentId)
-
     if (error) throw error
     return data
   }
 }
 
-// Modelos de avaliação (templates)
 export const templatesService = {
   async getAll() {
     const { data, error } = await supabase
@@ -157,7 +153,6 @@ export const templatesService = {
   }
 }
 
-// Perguntas ligadas a um template
 export const templateQuestionsService = {
   async getByTemplate(templateId) {
     const { data, error } = await supabase

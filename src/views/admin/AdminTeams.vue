@@ -67,6 +67,12 @@
         </div>
       </div>
 
+      <!-- ✅ DEBUG: mostra os cabeçalhos lidos do arquivo -->
+      <div v-if="debugHeaders.length" class="debug-box">
+        <strong>🔍 Cabeçalhos detectados na planilha:</strong>
+        <span v-for="(h, i) in debugHeaders" :key="i" class="debug-pill">{{ h }}</span>
+      </div>
+
       <div class="import-preview">
         <div class="preview-header">
           <span>
@@ -82,19 +88,37 @@
           </button>
         </div>
 
+        <!-- ✅ Preview completo com todos os campos -->
         <div v-if="csvData.length" class="preview-table">
           <table>
             <thead>
               <tr>
-                <th>Estande</th>
+                <th>N° Estande</th>
+                <th>Categoria da Premiação</th>
+                <th>Área de Conhecimento</th>
+                <th>Cidade</th>
                 <th>Nome do Artigo</th>
+                <th>Etapa de Ensino</th>
                 <th>Escola</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(row, i) in csvData.slice(0, 5)" :key="i">
                 <td>{{ row.numero_estande }}</td>
-                <td>{{ row.name?.slice(0, 30) }}</td>
+                <td>
+                  <!-- ✅ Alerta visual se category vier vazio -->
+                  <span :style="{ color: row.category ? '#2e7d32' : '#d32f2f', fontWeight: 600 }">
+                    {{ row.category || '⚠️ VAZIO' }}
+                  </span>
+                </td>
+                <td>
+                  <span :style="{ color: row.area_conhecimento ? '#2e7d32' : '#d32f2f', fontWeight: 600 }">
+                    {{ row.area_conhecimento || '⚠️ VAZIO' }}
+                  </span>
+                </td>
+                <td>{{ row.cidade }}</td>
+                <td>{{ row.name?.slice(0, 40) }}</td>
+                <td>{{ row.etapa_ensino }}</td>
                 <td>{{ row.escola }}</td>
               </tr>
             </tbody>
@@ -115,45 +139,31 @@
             <tr>
               <th @click="setSort('numero_estande')" class="sortable">
                 N° Estande
-                <span class="sort-icon" v-if="sortBy === 'numero_estande'">
-                  {{ sortDir === 'asc' ? '▲' : '▼' }}
-                </span>
+                <span class="sort-icon" v-if="sortBy === 'numero_estande'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
               </th>
               <th @click="setSort('category')" class="sortable">
                 Categoria da Premiação
-                <span class="sort-icon" v-if="sortBy === 'category'">
-                  {{ sortDir === 'asc' ? '▲' : '▼' }}
-                </span>
+                <span class="sort-icon" v-if="sortBy === 'category'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
               </th>
               <th @click="setSort('area_conhecimento')" class="sortable">
                 Área de Conhecimento
-                <span class="sort-icon" v-if="sortBy === 'area_conhecimento'">
-                  {{ sortDir === 'asc' ? '▲' : '▼' }}
-                </span>
+                <span class="sort-icon" v-if="sortBy === 'area_conhecimento'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
               </th>
               <th @click="setSort('cidade')" class="sortable">
                 Cidade
-                <span class="sort-icon" v-if="sortBy === 'cidade'">
-                  {{ sortDir === 'asc' ? '▲' : '▼' }}
-                </span>
+                <span class="sort-icon" v-if="sortBy === 'cidade'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
               </th>
               <th @click="setSort('name')" class="sortable">
                 Nome do Artigo
-                <span class="sort-icon" v-if="sortBy === 'name'">
-                  {{ sortDir === 'asc' ? '▲' : '▼' }}
-                </span>
+                <span class="sort-icon" v-if="sortBy === 'name'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
               </th>
               <th @click="setSort('etapa_ensino')" class="sortable">
                 Etapa de Ensino
-                <span class="sort-icon" v-if="sortBy === 'etapa_ensino'">
-                  {{ sortDir === 'asc' ? '▲' : '▼' }}
-                </span>
+                <span class="sort-icon" v-if="sortBy === 'etapa_ensino'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
               </th>
               <th @click="setSort('escola')" class="sortable">
                 Escola
-                <span class="sort-icon" v-if="sortBy === 'escola'">
-                  {{ sortDir === 'asc' ? '▲' : '▼' }}
-                </span>
+                <span class="sort-icon" v-if="sortBy === 'escola'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
               </th>
               <th class="col-actions">Ações</th>
             </tr>
@@ -188,7 +198,14 @@ import { ref, computed, onMounted } from 'vue'
 import * as XLSX from 'xlsx'
 import { teamsService } from '@/services/supabase.js'
 
-const teams = ref([])
+const teams    = ref([])
+const error    = ref('')
+const csvData  = ref([])
+const fileInput = ref(null)
+const importing = ref(false)
+
+// ✅ Armazena os cabeçalhos originais lidos do arquivo para debug visual
+const debugHeaders = ref([])
 
 const newTeam = ref({
   numero_estande: '',
@@ -200,36 +217,29 @@ const newTeam = ref({
   etapa_ensino: ''
 })
 
-const error = ref('')
-const csvData = ref([])
-const fileInput = ref(null)
-const importing = ref(false)
-
-const sortBy = ref('numero_estande')
+const sortBy  = ref('numero_estande')
 const sortDir = ref('asc')
 
 const headerMap = {
   // N° ESTANDE
-  'n estande':             'numero_estande',
-  'n° estande':            'numero_estande',
-  'no estande':            'numero_estande',
-  'numero estande':        'numero_estande',
-  'número estande':        'numero_estande',
-  'numero do estande':     'numero_estande',
-  'número do estande':     'numero_estande',
-  'numero_estande':        'numero_estande',
+  'n estande':              'numero_estande',
+  'n° estande':             'numero_estande',
+  'no estande':             'numero_estande',
+  'numero estande':         'numero_estande',
+  'numero do estande':      'numero_estande',
+  'numero_estande':         'numero_estande',
 
-  // CATEGORIA DA PREMIAÇÃO
-  'categoria da premiacao':  'category',
-  'categoria da premiação':  'category',
+  // CATEGORIA DA PREMIAÇÃO → category
+  'categoria da premiacao':   'category',
+  'categoria da premiacao':   'category',
   'categoria para premiacao': 'category',
-  'categoria para premiação': 'category',
-  'category':                'category',
+  'category':                 'category',
 
-  // ÁREA DE CONHECIMENTO
-  'area de conhecimento':  'area_conhecimento',
-  'área de conhecimento':  'area_conhecimento',
-  'area_conhecimento':     'area_conhecimento',
+  // ÁREA DE CONHECIMENTO → area_conhecimento
+  'area de conhecimento':   'area_conhecimento',
+  'area do conhecimento':   'area_conhecimento',
+  'area conhecimento':      'area_conhecimento',
+  'area_conhecimento':      'area_conhecimento',
 
   // CIDADE
   'cidade': 'cidade',
@@ -248,54 +258,54 @@ const headerMap = {
   'escola': 'escola',
 }
 
-const normalizeHeader = (text = '') => {
-  return text
+// ✅ Normaliza removendo acentos, espaços extras e convertendo para minúsculo
+const normalizeHeader = (text = '') =>
+  text
     .toString()
     .trim()
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-}
+    .replace(/[\u0300-\u036f]/g, '')  // remove diacríticos
+    .replace(/\s+/g, ' ')             // colapsa espaços múltiplos
 
 const mapRowsToInternalFields = (rows) => {
-  const parsed = rows
+  return rows
     .map((row) => {
       const mapped = {
-        numero_estande: '',
-        name: '',
-        escola: '',
-        cidade: '',
+        numero_estande:    '',
+        name:              '',
+        escola:            '',
+        cidade:            '',
         area_conhecimento: '',
-        etapa_ensino: '',
-        category: ''
+        etapa_ensino:      '',
+        category:          ''
       }
 
       Object.entries(row).forEach(([key, value]) => {
-        const normalizedKey = normalizeHeader(key)
-        const internalField = headerMap[normalizedKey]
+        const normalizedKey  = normalizeHeader(key)
+        const internalField  = headerMap[normalizedKey]
+
+        // ✅ Log no console para depuração
+        console.log(`[Teams Import] col: "${key}" → norm: "${normalizedKey}" → field: "${internalField}" → val: "${value}"`)
 
         if (!internalField) return
-
         mapped[internalField] = value?.toString().trim() || ''
       })
 
       return mapped
     })
     .filter(row => row.name && row.escola)
-
-  return parsed
 }
 
 const validateHeaders = (rows) => {
   if (!rows.length) {
-    error.value = 'A planilha/arquivo não possui linhas para importar.'
+    error.value = 'A planilha não possui linhas para importar.'
     return false
   }
 
   const firstRowKeys = Object.keys(rows[0]).map(normalizeHeader)
-
-  const hasArtigo = firstRowKeys.some(key => headerMap[key] === 'name')
-  const hasEscola = firstRowKeys.some(key => headerMap[key] === 'escola')
+  const hasArtigo    = firstRowKeys.some(key => headerMap[key] === 'name')
+  const hasEscola    = firstRowKeys.some(key => headerMap[key] === 'escola')
 
   if (!hasArtigo || !hasEscola) {
     error.value =
@@ -308,21 +318,20 @@ const validateHeaders = (rows) => {
 
 const parseCsvFile = async (file) => {
   const text = await file.text()
-  const workbook = XLSX.read(text, { type: 'string', FS: ';' })
-  const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-  return XLSX.utils.sheet_to_json(firstSheet, { defval: '', raw: false })
+  const wb = XLSX.read(text, { type: 'string', FS: ';' })
+  return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false })
 }
 
 const parseExcelFile = async (file) => {
   const ab = await file.arrayBuffer()
-  const workbook = XLSX.read(ab)
-  const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-  return XLSX.utils.sheet_to_json(firstSheet, { defval: '', raw: false })
+  const wb = XLSX.read(ab)
+  return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false })
 }
 
 const handleFile = async (e) => {
-  error.value = ''
-  csvData.value = []
+  error.value    = ''
+  csvData.value  = []
+  debugHeaders.value = []
 
   const file = e.target.files?.[0]
   if (!file) return
@@ -341,12 +350,17 @@ const handleFile = async (e) => {
       return
     }
 
+    // ✅ Captura cabeçalhos originais para debug visual
+    if (rows.length) {
+      debugHeaders.value = Object.keys(rows[0])
+    }
+
     if (!validateHeaders(rows)) return
 
     csvData.value = mapRowsToInternalFields(rows)
 
     if (!csvData.value.length) {
-      error.value = 'Nenhuma linha válida encontrada para importar.'
+      error.value = 'Nenhuma linha válida encontrada. Verifique se Nome do Artigo e Escola estão preenchidos.'
     }
   } catch (err) {
     error.value = 'Erro ao ler arquivo: ' + err.message
@@ -357,28 +371,26 @@ const importTeams = async () => {
   if (!csvData.value.length) return
 
   importing.value = true
-  error.value = ''
+  error.value     = ''
   let successCount = 0
 
   try {
     for (const row of csvData.value) {
       await teamsService.create({
-        numero_estande:    row.numero_estande || '',
-        name:              row.name || '',
-        escola:            row.escola || '',
-        cidade:            row.cidade || '',
+        numero_estande:    row.numero_estande    || '',
+        name:              row.name              || '',
+        escola:            row.escola            || '',
+        cidade:            row.cidade            || '',
         area_conhecimento: row.area_conhecimento || '',
-        etapa_ensino:      row.etapa_ensino || '',
-        category:          row.category || ''
+        etapa_ensino:      row.etapa_ensino      || '',
+        category:          row.category          || ''
       })
       successCount++
     }
 
-    csvData.value = []
-
-    if (fileInput.value) {
-      fileInput.value.value = ''
-    }
+    csvData.value      = []
+    debugHeaders.value = []
+    if (fileInput.value) fileInput.value.value = ''
 
     await loadTeams()
     alert(`✅ ${successCount} projetos importados!`)
@@ -399,15 +411,10 @@ const loadTeams = async () => {
 
 const createTeam = async () => {
   try {
-    await teamsService.create(newTeam.value)
+    await teamsService.create({ ...newTeam.value })
     newTeam.value = {
-      numero_estande: '',
-      name: '',
-      escola: '',
-      cidade: '',
-      area_conhecimento: '',
-      category: '',
-      etapa_ensino: ''
+      numero_estande: '', name: '', escola: '', cidade: '',
+      area_conhecimento: '', category: '', etapa_ensino: ''
     }
     await loadTeams()
   } catch (err) {
@@ -430,32 +437,25 @@ const setSort = (field) => {
   if (sortBy.value === field) {
     sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
   } else {
-    sortBy.value = field
+    sortBy.value  = field
     sortDir.value = 'asc'
   }
 }
 
 const sortedTeams = computed(() => {
   const arr = [...teams.value]
-
   arr.sort((a, b) => {
     const fa = a[sortBy.value] ?? ''
     const fb = b[sortBy.value] ?? ''
-
     if (sortBy.value === 'numero_estande') {
-      const na = Number(fa) || 0
-      const nb = Number(fb) || 0
-      return sortDir.value === 'asc' ? na - nb : nb - na
+      return sortDir.value === 'asc' ? (Number(fa)||0) - (Number(fb)||0) : (Number(fb)||0) - (Number(fa)||0)
     }
-
     const sa = String(fa).toLocaleLowerCase('pt-BR')
     const sb = String(fb).toLocaleLowerCase('pt-BR')
-
     if (sa < sb) return sortDir.value === 'asc' ? -1 : 1
     if (sa > sb) return sortDir.value === 'asc' ? 1 : -1
     return 0
   })
-
   return arr
 })
 
@@ -470,10 +470,7 @@ onMounted(loadTeams)
   box-sizing: border-box;
 }
 
-.page-header {
-  max-width: 1080px;
-  margin: 0 auto 20px;
-}
+.page-header { max-width: 1080px; margin: 0 auto 20px; }
 
 .page-header h1 {
   margin: 0;
@@ -483,11 +480,7 @@ onMounted(loadTeams)
   text-transform: uppercase;
 }
 
-.page-header p {
-  margin: 4px 0 0;
-  font-size: 14px;
-  color: #546e7a;
-}
+.page-header p { margin: 4px 0 0; font-size: 14px; color: #546e7a; }
 
 .card {
   max-width: 1080px;
@@ -511,7 +504,31 @@ onMounted(loadTeams)
 .import-card {
   background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%);
   border: 2px dashed #81c784 !important;
-  margin-bottom: 20px;
+}
+
+/* ✅ Caixa de debug de cabeçalhos */
+.debug-box {
+  margin: 12px 0;
+  padding: 10px 14px;
+  background: #fff8e1;
+  border-left: 4px solid #fbc02d;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #5d4037;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.debug-pill {
+  background: #fff3e0;
+  border: 1px solid #ffe082;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e65100;
 }
 
 .form-grid {
@@ -566,9 +583,7 @@ onMounted(loadTeams)
   box-shadow: 0 8px 20px rgba(0, 179, 74, 0.45);
 }
 
-.table-card {
-  overflow: hidden;
-}
+.table-card { overflow: hidden; }
 
 .table-header {
   display: flex;
@@ -577,21 +592,9 @@ onMounted(loadTeams)
   margin-bottom: 10px;
 }
 
-.table-count {
-  font-size: 12px;
-  color: #78909c;
-}
-
-.table-wrapper {
-  width: 100%;
-  overflow-x: auto;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
+.table-count { font-size: 12px; color: #78909c; }
+.table-wrapper { width: 100%; overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 .table th,
 .table td {
@@ -606,14 +609,9 @@ onMounted(loadTeams)
   background-color: #f5f9f6;
 }
 
-.table tbody tr:hover {
-  background-color: #f9fcf9;
-}
+.table tbody tr:hover { background-color: #f9fcf9; }
 
-.col-actions {
-  text-align: right;
-  white-space: nowrap;
-}
+.col-actions { text-align: right; white-space: nowrap; }
 
 .btn-danger {
   border: none;
@@ -626,16 +624,9 @@ onMounted(loadTeams)
   transition: background 0.18s, transform 0.18s;
 }
 
-.btn-danger:hover {
-  background: #d32f2f;
-  transform: translateY(-1px);
-}
+.btn-danger:hover { background: #d32f2f; transform: translateY(-1px); }
 
-.empty {
-  text-align: center;
-  padding: 20px 8px;
-  color: #90a4ae;
-}
+.empty { text-align: center; padding: 20px 8px; color: #90a4ae; }
 
 .error {
   max-width: 1080px;
@@ -646,70 +637,39 @@ onMounted(loadTeams)
 }
 
 @media (max-width: 900px) {
-  .form-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 600px) {
-  .admin-teams {
-    padding: 20px 14px 28px;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .card {
-    padding: 18px 16px 18px;
-  }
-
-  .preview-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
+  .admin-teams { padding: 20px 14px 28px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .card { padding: 18px 16px 18px; }
+  .preview-header { flex-direction: column; align-items: stretch; gap: 12px; }
 }
 
-.table th.sortable {
-  cursor: pointer;
-  user-select: none;
-}
-
-.table th.sortable:hover {
-  background-color: #ecf4ee;
-}
-
-.sort-icon {
-  margin-left: 4px;
-  font-size: 11px;
-  color: #78909c;
-}
+.table th.sortable { cursor: pointer; user-select: none; }
+.table th.sortable:hover { background-color: #ecf4ee; }
+.sort-icon { margin-left: 4px; font-size: 11px; color: #78909c; }
 
 .helper {
   color: #118c3a;
   font-size: 14px;
   font-weight: 500;
   margin: 8px 0 16px 0;
-  letter-spacing: 0.3px;
   background: rgba(17, 140, 58, 0.08);
   padding: 10px 14px;
   border-radius: 8px;
   border-left: 4px solid #4caf50;
+  line-height: 1.7;
 }
 
-.import-options {
-  margin: 0;
-  display: grid;
-  gap: 16px;
-}
+.import-options { margin: 0; display: grid; gap: 16px; }
 
 .file-import label {
   font-weight: 600;
   color: #2e7d32;
   margin-bottom: 12px;
   display: block;
-  letter-spacing: 0.3px;
 }
 
 .file-import input {
@@ -782,9 +742,7 @@ onMounted(loadTeams)
   box-shadow: 0 2px 6px rgba(0, 179, 74, 0.2);
 }
 
-.preview-table {
-  overflow-x: auto;
-}
+.preview-table { overflow-x: auto; }
 
 .preview-table table {
   width: 100%;
@@ -813,7 +771,5 @@ onMounted(loadTeams)
   color: #2e7d32;
 }
 
-.preview-table tr:hover td {
-  background: rgba(129, 199, 132, 0.1);
-}
+.preview-table tr:hover td { background: rgba(129, 199, 132, 0.1); }
 </style>
