@@ -131,8 +131,8 @@
     <section class="card table-card">
       <div class="table-header">
         <h2>Atribuições geradas</h2>
-        <!-- ✅ Contador + botão exportar -->
-        <div style="display:flex; align-items:center; gap:12px;">
+        <!-- ✅ Botões de exportação -->
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
           <span class="table-count">{{ sortedAssignments.length }} código(s)</span>
           <button
             class="btn-export"
@@ -140,6 +140,13 @@
             :disabled="!sortedAssignments.length"
           >
             ⬇ Exportar Excel
+          </button>
+          <button
+            class="btn-export btn-export-answers"
+            @click="exportAnswersToExcel"
+            :disabled="!sortedAssignments.length"
+          >
+            📋 Exportar Respostas
           </button>
         </div>
       </div>
@@ -224,6 +231,7 @@
 import { useRouter } from 'vue-router'
 import { ref, computed, onMounted } from 'vue'
 import * as XLSX from 'xlsx'
+import { supabase } from '@/composables/useSupabase.js'
 import {
   assignmentsService,
   teamsService,
@@ -458,7 +466,7 @@ const importAssignments = async () => {
   }
 }
 
-// ── Exportar para Excel ───────────────────────────────────────
+// ── Exportar Atribuições para Excel ──────────────────────────
 const exportToExcel = () => {
   if (!sortedAssignments.value.length) {
     alert('Nenhuma atribuição para exportar.')
@@ -477,16 +485,15 @@ const exportToExcel = () => {
   }))
 
   const ws = XLSX.utils.json_to_sheet(rows)
-
   ws['!cols'] = [
-    { wch: 14 }, // Código
-    { wch: 12 }, // N° Estande
-    { wch: 25 }, // Categoria da Premiação
-    { wch: 25 }, // Área de Conhecimento
-    { wch: 60 }, // Nome do Artigo
-    { wch: 25 }, // Avaliador
-    { wch: 10 }, // Tipo
-    { wch: 14 }, // Status
+    { wch: 14 },
+    { wch: 12 },
+    { wch: 25 },
+    { wch: 25 },
+    { wch: 60 },
+    { wch: 25 },
+    { wch: 10 },
+    { wch: 14 },
   ]
 
   const wb = XLSX.utils.book_new()
@@ -494,6 +501,95 @@ const exportToExcel = () => {
 
   const date = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
   XLSX.writeFile(wb, `atribuicoes_${date}.xlsx`)
+}
+
+// ── Exportar Respostas para Excel ─────────────────────────────
+const exportAnswersToExcel = async () => {
+  if (!sortedAssignments.value.length) {
+    alert('Nenhuma atribuição para exportar.')
+    return
+  }
+
+  try {
+    const ids = sortedAssignments.value.map(a => a.id)
+
+    const { data: answers, error: err } = await supabase
+      .from('evaluation_answers')
+      .select(`
+        assignment_id,
+        answer_value,
+        question:questions ( id, text, type )
+      `)
+      .in('assignment_id', ids)
+
+    if (err) throw err
+
+    // Extrai perguntas únicas mantendo ordem de aparição
+    const questionsMap = new Map()
+    ;(answers || []).forEach(ans => {
+      if (ans.question && !questionsMap.has(ans.question.id)) {
+        questionsMap.set(ans.question.id, ans.question)
+      }
+    })
+    const questionsList = [...questionsMap.values()]
+
+    // Agrupa respostas por assignment_id
+    const answersByAssignment = {}
+    ;(answers || []).forEach(ans => {
+      if (!answersByAssignment[ans.assignment_id]) {
+        answersByAssignment[ans.assignment_id] = {}
+      }
+      answersByAssignment[ans.assignment_id][ans.question.id] = ans.answer_value
+    })
+
+    // Remove tags HTML do texto da pergunta
+    const stripHtml = (html = '') => {
+      const tmp = document.createElement('div')
+      tmp.innerHTML = html
+      return tmp.textContent || tmp.innerText || ''
+    }
+
+    // Monta linhas — uma por atribuição
+    const rows = sortedAssignments.value.map(a => {
+      const base = {
+        'Código':                 a.code,
+        'N° Estande':             a.team?.numero_estande || getTeamField(a.team_id, 'numero_estande') || '—',
+        'Categoria da Premiação': a.team?.category       || getTeamField(a.team_id, 'category')       || '—',
+        'Área de Conhecimento':   a.team?.area_conhecimento || getTeamField(a.team_id, 'area_conhecimento') || '—',
+        'Nome do Artigo':         a.team?.name            || getTeamField(a.team_id, 'name')           || '—',
+        'Avaliador':              a.evaluator?.name        || '—',
+        'Tipo':                   a.template?.type === 'online' ? 'Virtual' : 'Pitch',
+        'Status':                 a.status === 'respondido' ? 'RESPONDIDO' : 'PENDENTE',
+      }
+
+      // Coluna dinâmica por pergunta
+      questionsList.forEach((q, idx) => {
+        const colName = `Q${idx + 1} - ${stripHtml(q.text).slice(0, 60)}`
+        const val = answersByAssignment[a.id]?.[q.id]
+        base[colName] = val !== undefined ? val : '—'
+      })
+
+      return base
+    })
+
+    const ws = XLSX.utils.json_to_sheet(rows)
+
+    // Largura: 8 colunas fixas + colunas de perguntas
+    ws['!cols'] = [
+      { wch: 14 }, { wch: 12 }, { wch: 25 }, { wch: 25 },
+      { wch: 60 }, { wch: 25 }, { wch: 10 }, { wch: 14 },
+      ...questionsList.map(() => ({ wch: 30 }))
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Respostas')
+
+    const date = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
+    XLSX.writeFile(wb, `respostas_${date}.xlsx`)
+
+  } catch (err) {
+    error.value = 'Erro ao exportar respostas: ' + err.message
+  }
 }
 
 // ── CRUD ──────────────────────────────────────────────────────
@@ -744,6 +840,8 @@ onMounted(loadAll)
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .table-count { font-size: 12px; color: #78909c; }
@@ -823,7 +921,7 @@ onMounted(loadAll)
 
 .btn-danger:hover { background: #d32f2f; transform: translateY(-1px); }
 
-/* ✅ Botão exportar */
+/* ✅ Botões de exportação */
 .btn-export {
   border: none;
   border-radius: 999px;
@@ -845,6 +943,14 @@ onMounted(loadAll)
 .btn-export:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.btn-export-answers {
+  background: #1565c0;
+}
+
+.btn-export-answers:hover:not(:disabled) {
+  background: #0d47a1;
 }
 
 .empty { text-align: center; padding: 20px 8px; color: #90a4ae; }
