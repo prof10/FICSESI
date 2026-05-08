@@ -131,7 +131,17 @@
     <section class="card table-card">
       <div class="table-header">
         <h2>Atribuições geradas</h2>
-        <span class="table-count">{{ sortedAssignments.length }} código(s)</span>
+        <!-- ✅ Contador + botão exportar -->
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span class="table-count">{{ sortedAssignments.length }} código(s)</span>
+          <button
+            class="btn-export"
+            @click="exportToExcel"
+            :disabled="!sortedAssignments.length"
+          >
+            ⬇ Exportar Excel
+          </button>
+        </div>
       </div>
 
       <div class="table-wrapper">
@@ -177,9 +187,8 @@
             <tr v-for="a in sortedAssignments" :key="a.id">
               <td><span class="code-pill">{{ a.code }}</span></td>
               <td>{{ a.team?.numero_estande || '—' }}</td>
-              <!-- ✅ Busca direto no teams local pelo team_id caso o join não traga -->
-              <td>{{ getTeamField(a.team_id, 'category') }}</td>
-              <td>{{ getTeamField(a.team_id, 'area_conhecimento') }}</td>
+              <td>{{ a.team?.category || getTeamField(a.team_id, 'category') }}</td>
+              <td>{{ a.team?.area_conhecimento || getTeamField(a.team_id, 'area_conhecimento') }}</td>
               <td>{{ a.team?.name || getTeamField(a.team_id, 'name') }}</td>
               <td>{{ a.evaluator?.name }}</td>
               <td>{{ a.template?.type === 'online' ? 'Virtual' : 'Pitch' }}</td>
@@ -245,7 +254,7 @@ const importErrors = ref([])
 const sortBy  = ref('created_at')
 const sortDir = ref('desc')
 
-// ✅ HELPER: busca campo diretamente na lista local de teams (fallback seguro)
+// ── Helper fallback ───────────────────────────────────────────
 const getTeamField = (teamId, field) => {
   const t = teams.value.find(t => t.id === teamId)
   return t?.[field] ?? ''
@@ -256,15 +265,12 @@ const normalize = (text = '') =>
   text.toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
 const headerMap = {
-  // N° Estande
   'estande':                  'estande',
   'n estande':                'estande',
   'n° estande':               'estande',
   'no estande':               'estande',
   'numero estande':           'estande',
   'número estande':           'estande',
-
-  // Categoria da Premiação → category
   'premiacao':                'premiacao',
   'premiação':                'premiacao',
   'categoria':                'premiacao',
@@ -273,25 +279,17 @@ const headerMap = {
   'categoria da premiação':   'premiacao',
   'categoria premiacao':      'premiacao',
   'categoria premiação':      'premiacao',
-
-  // Área de Conhecimento → area_conhecimento
   'area do conhecimento':     'area_conhecimento',
   'área do conhecimento':     'area_conhecimento',
   'area de conhecimento':     'area_conhecimento',
   'área de conhecimento':     'area_conhecimento',
   'area conhecimento':        'area_conhecimento',
   'área conhecimento':        'area_conhecimento',
-
-  // Nome do Artigo
   'nome do artigo':           'nome_artigo',
   'projeto':                  'nome_artigo',
   'name':                     'nome_artigo',
-
-  // Avaliador
   'avaliador':                'avaliador',
   'nome do avaliador':        'avaliador',
-
-  // Tipo
   'tipo':                     'tipo',
   'type':                     'tipo',
   'modelo':                   'tipo',
@@ -312,7 +310,7 @@ const parseExcelFile = async (file) => {
 
 // ── Validação e cruzamento ────────────────────────────────────
 const resolveRows = (rows) => {
-  const errors  = []
+  const errors   = []
   const resolved = []
 
   rows.forEach((row, idx) => {
@@ -460,12 +458,49 @@ const importAssignments = async () => {
   }
 }
 
+// ── Exportar para Excel ───────────────────────────────────────
+const exportToExcel = () => {
+  if (!sortedAssignments.value.length) {
+    alert('Nenhuma atribuição para exportar.')
+    return
+  }
+
+  const rows = sortedAssignments.value.map(a => ({
+    'Código':                 a.code,
+    'N° Estande':             a.team?.numero_estande || getTeamField(a.team_id, 'numero_estande') || '—',
+    'Categoria da Premiação': a.team?.category       || getTeamField(a.team_id, 'category')       || '—',
+    'Área de Conhecimento':   a.team?.area_conhecimento || getTeamField(a.team_id, 'area_conhecimento') || '—',
+    'Nome do Artigo':         a.team?.name            || getTeamField(a.team_id, 'name')           || '—',
+    'Avaliador':              a.evaluator?.name        || '—',
+    'Tipo':                   a.template?.type === 'online' ? 'Virtual' : 'Pitch',
+    'Status':                 a.status === 'respondido' ? 'RESPONDIDO' : 'PENDENTE',
+  }))
+
+  const ws = XLSX.utils.json_to_sheet(rows)
+
+  ws['!cols'] = [
+    { wch: 14 }, // Código
+    { wch: 12 }, // N° Estande
+    { wch: 25 }, // Categoria da Premiação
+    { wch: 25 }, // Área de Conhecimento
+    { wch: 60 }, // Nome do Artigo
+    { wch: 25 }, // Avaliador
+    { wch: 10 }, // Tipo
+    { wch: 14 }, // Status
+  ]
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Atribuições')
+
+  const date = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
+  XLSX.writeFile(wb, `atribuicoes_${date}.xlsx`)
+}
+
 // ── CRUD ──────────────────────────────────────────────────────
 const goToEvaluationDetails = (id) => router.push(`/admin/evaluations/${id}`)
 
 const loadAll = async () => {
   try {
-    // ✅ Carrega teams separadamente para garantir todos os campos
     teams.value       = await teamsService.getAll()
     evaluators.value  = await evaluatorsService.getAll()
     templates.value   = await templatesService.getAll()
@@ -707,7 +742,7 @@ onMounted(loadAll)
 .table-header {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   margin-bottom: 10px;
 }
 
@@ -787,6 +822,30 @@ onMounted(loadAll)
 }
 
 .btn-danger:hover { background: #d32f2f; transform: translateY(-1px); }
+
+/* ✅ Botão exportar */
+.btn-export {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #118c3a;
+  color: #ffffff;
+  letter-spacing: 0.05em;
+  transition: background 0.18s, transform 0.18s;
+}
+
+.btn-export:hover:not(:disabled) {
+  background: #02983f;
+  transform: translateY(-1px);
+}
+
+.btn-export:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 .empty { text-align: center; padding: 20px 8px; color: #90a4ae; }
 
