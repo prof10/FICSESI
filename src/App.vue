@@ -3,7 +3,7 @@
     <header v-if="authStore.isLoggedIn" class="topbar">
       <nav class="topbar-nav">
         <router-link to="/admin/dashboard">Início</router-link>
-        <router-link to="/admin/teams">Projetos</router-link>
+        <router-link to="/admin/teams">Artigos</router-link>
         <router-link to="/admin/evaluators">Avaliadores</router-link>
         <router-link to="/admin/questions">Questões</router-link>
         <router-link to="/admin/templates">Avaliações</router-link>
