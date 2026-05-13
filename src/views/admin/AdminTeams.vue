@@ -1,12 +1,12 @@
 <template>
   <div class="admin-teams">
     <header class="page-header">
-      <h1>Projetos</h1>
-      <p>Cadastro e gestão dos projetos participantes da FICSESI.</p>
+      <h1>Artigos</h1>
+      <p>Cadastro e gestão dos artigos participantes da FICSESI.</p>
     </header>
 
     <section class="card form-card">
-      <h2>Cadastrar Projeto</h2>
+      <h2>Cadastrar Artigo</h2>
       <form @submit.prevent="createTeam" class="form-grid">
         <input v-model="newTeam.numero_estande" placeholder="N° Estande" />
         <input v-model="newTeam.name" placeholder="Nome do Artigo" required />
@@ -41,13 +41,13 @@
           <option value="EJA">EJA</option>
         </select>
         <div class="form-actions">
-          <button type="submit">Cadastrar projeto</button>
+          <button type="submit">Cadastrar Artigo</button>
         </div>
       </form>
     </section>
 
     <section class="card import-card">
-      <h2>Importar Projetos</h2>
+      <h2>Importar Artigos</h2>
 
       <p class="helper">
         Você pode importar arquivos .xlsx, .xls ou .csv com os campos na ordem:<br />
@@ -56,7 +56,7 @@
 
       <div class="import-options">
         <div class="file-import">
-          <label for="spreadsheet-file">Importar projetos por Excel ou CSV:</label>
+          <label for="spreadsheet-file">Importar Artigos por Excel ou CSV:</label>
           <input
             id="spreadsheet-file"
             ref="fileInput"
@@ -76,7 +76,7 @@
       <div class="import-preview">
         <div class="preview-header">
           <span>
-            {{ csvData.length ? `✅ ${csvData.length} projetos prontos` : 'Pré-visualização dos Projetos' }}
+            {{ csvData.length ? `✅ ${csvData.length} Artigos prontos` : 'Pré-visualização dos Artigos' }}
           </span>
           <button
             type="button"
@@ -129,7 +129,7 @@
 
     <section class="card table-card">
       <div class="table-header">
-        <h2>Projetos cadastrados</h2>
+        <h2>Artigos cadastrados</h2>
         <span class="table-count">{{ sortedTeams.length }} equipe(s)</span>
       </div>
 
@@ -246,7 +246,7 @@ const headerMap = {
 
   // NOME DO ARTIGO
   'nome do artigo': 'name',
-  'projeto':        'name',
+  'Artigo':        'name',
   'name':           'name',
 
   // ETAPA DE ENSINO
@@ -393,7 +393,7 @@ const importTeams = async () => {
     if (fileInput.value) fileInput.value.value = ''
 
     await loadTeams()
-    alert(`✅ ${successCount} projetos importados!`)
+    alert(`✅ ${successCount} Artigos importados!`)
   } catch (err) {
     error.value = 'Erro ao importar: ' + err.message
   } finally {

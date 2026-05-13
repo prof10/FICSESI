@@ -13,11 +13,7 @@
           <h3>Categorias da premiação</h3>
           <div v-for="cat in categories" :key="cat" class="checkbox-item">
             <label>
-              <input
-                type="checkbox"
-                v-model="selectedCategories"
-                :value="cat"
-              />
+              <input type="checkbox" v-model="selectedCategories" :value="cat" />
               {{ cat }}
             </label>
           </div>
@@ -27,11 +23,7 @@
           <h3>Etapa de ensino</h3>
           <div v-for="etapa in etapas" :key="etapa" class="checkbox-item">
             <label>
-              <input
-                type="checkbox"
-                v-model="selectedEtapas"
-                :value="etapa"
-              />
+              <input type="checkbox" v-model="selectedEtapas" :value="etapa" />
               {{ etapa }}
             </label>
           </div>
@@ -39,17 +31,9 @@
 
         <div class="filter-block">
           <h3>Modelos de avaliação</h3>
-          <div
-            v-for="tpl in templates"
-            :key="tpl.id"
-            class="checkbox-item"
-          >
+          <div v-for="tpl in templates" :key="tpl.id" class="checkbox-item">
             <label>
-              <input
-                type="checkbox"
-                v-model="selectedTemplateIds"
-                :value="tpl.id"
-              />
+              <input type="checkbox" v-model="selectedTemplateIds" :value="tpl.id" />
               {{ tpl.name }} ({{ tpl.type === 'online' ? 'Virtual' : 'Pitch' }})
             </label>
           </div>
@@ -78,9 +62,19 @@
     </section>
 
     <section class="card ranking-card">
+      <!-- ✅ table-header com botão de exportação -->
       <div class="table-header">
         <h2>Resultado</h2>
-        <span class="table-count">{{ ranking.length }} equipe(s)</span>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span class="table-count">{{ ranking.length }} equipe(s)</span>
+          <button
+            class="btn-export"
+            @click="exportToExcel"
+            :disabled="!ranking.length"
+          >
+            ⬇ Exportar Excel
+          </button>
+        </div>
       </div>
 
       <div class="table-wrapper" v-if="ranking.length">
@@ -88,7 +82,7 @@
           <thead>
             <tr>
               <th>Posição</th>
-              <th>Projeto</th>
+              <th>Nome do Artigo</th><!-- ✅ era "Projeto" -->
               <th>Categoria da premiação</th>
               <th>Etapa</th>
               <th>Pontuação</th>
@@ -119,19 +113,20 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import * as XLSX from 'xlsx'
 import { supabase } from '@/composables/useSupabase.js'
 
 const categories = ref([])
-const etapas = ref([])
-const templates = ref([])
+const etapas     = ref([])
+const templates  = ref([])
 
-const selectedCategories = ref([])
-const selectedEtapas = ref([])
+const selectedCategories  = ref([])
+const selectedEtapas      = ref([])
 const selectedTemplateIds = ref([])
 
 const ranking = ref([])
 const loading = ref(false)
-const error = ref('')
+const error   = ref('')
 
 const loadFilters = async () => {
   error.value = ''
@@ -145,19 +140,13 @@ const loadFilters = async () => {
     return
   }
 
-  const setCats = new Set(
-    (teamsData || [])
-      .map((t) => t.category)
-      .filter((c) => !!c)
-  )
-  categories.value = Array.from(setCats).sort()
+  categories.value = Array.from(
+    new Set((teamsData || []).map(t => t.category).filter(Boolean))
+  ).sort()
 
-  const setEtapas = new Set(
-    (teamsData || [])
-      .map((t) => t.etapa_ensino)
-      .filter((e) => !!e)
-  )
-  etapas.value = Array.from(setEtapas).sort()
+  etapas.value = Array.from(
+    new Set((teamsData || []).map(t => t.etapa_ensino).filter(Boolean))
+  ).sort()
 
   const { data: tplData, error: tplError } = await supabase
     .from('evaluation_templates')
@@ -173,17 +162,11 @@ const loadFilters = async () => {
 }
 
 const loadRanking = async () => {
-  error.value = ''
+  error.value   = ''
   ranking.value = []
   loading.value = true
 
   try {
-    console.log('🔍 Filtros:', {
-      categories: selectedCategories.value,
-      etapas: selectedEtapas.value,
-      templates: selectedTemplateIds.value
-    })
-
     if (
       !selectedCategories.value.length ||
       !selectedEtapas.value.length ||
@@ -193,26 +176,20 @@ const loadRanking = async () => {
       return
     }
 
-    // Query da VIEW
     const { data, error: rankError } = await supabase
       .from('team_template_averages')
       .select('team_id, team_name, category, etapa_ensino, template_id, avg_score, evaluator_count')
-      .in('category', selectedCategories.value)
+      .in('category',    selectedCategories.value)
       .in('etapa_ensino', selectedEtapas.value)
       .in('template_id', selectedTemplateIds.value)
       .order('avg_score', { ascending: false })
 
-    console.log('📊 DADOS BRUTOS DA VIEW:', data)
-    console.log('❌ Erro query?', rankError)
-
     if (rankError) {
       error.value = 'Erro ao carregar ranking.'
-      console.error('Erro completo:', rankError)
       return
     }
 
     if (!data || data.length === 0) {
-      console.log('⚠️ Nenhum dado retornado')
       ranking.value = []
       return
     }
@@ -220,40 +197,51 @@ const loadRanking = async () => {
     const byTeam = new Map()
 
     for (const row of data) {
-      console.log('🔢 Linha:', {
-        team: row.team_name,
-        template: row.template_id,
-        avg: row.avg_score,
-        avaliadores: row.evaluator_count
-      })
-      
       const existing = byTeam.get(row.team_id)
       if (existing) {
         existing.total_score += row.avg_score
-        console.log('➕ Já existia, novo total:', existing.total_score)
       } else {
-        byTeam.set(row.team_id, { 
-          ...row, 
-          total_score: row.avg_score 
-        })
-        console.log('🆕 Novo time, score inicial:', row.avg_score)
+        byTeam.set(row.team_id, { ...row, total_score: row.avg_score })
       }
     }
 
-    const finalRanking = Array.from(byTeam.values()).sort((a, b) => b.total_score - a.total_score)
-    console.log('🏁 RANKING FINAL:', finalRanking)
-    
-    ranking.value = finalRanking
+    ranking.value = Array.from(byTeam.values())
+      .sort((a, b) => b.total_score - a.total_score)
 
   } catch (err) {
-    console.error('💥 Erro geral:', err)
     error.value = 'Erro inesperado.'
   } finally {
     loading.value = false
   }
 }
 
+// ✅ Exportar ranking para Excel
+const exportToExcel = () => {
+  if (!ranking.value.length) return
 
+  const rows = ranking.value.map((row, index) => ({
+    'Posição':                index + 1,
+    'Nome do Artigo':         row.team_name,
+    'Categoria da Premiação': row.category,
+    'Etapa de Ensino':        row.etapa_ensino,
+    'Pontuação':              row.total_score,
+  }))
+
+  const ws = XLSX.utils.json_to_sheet(rows)
+  ws['!cols'] = [
+    { wch: 10 },
+    { wch: 70 },
+    { wch: 25 },
+    { wch: 30 },
+    { wch: 12 },
+  ]
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Ranking')
+
+  const date = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
+  XLSX.writeFile(wb, `ranking_${date}.xlsx`)
+}
 
 onMounted(loadFilters)
 </script>
@@ -310,9 +298,7 @@ onMounted(loadFilters)
   flex-wrap: wrap;
 }
 
-.filter-block {
-  min-width: 200px;
-}
+.filter-block { min-width: 200px; }
 
 .filter-block h3 {
   margin: 0 0 6px;
@@ -376,20 +362,44 @@ onMounted(loadFilters)
   font-size: 13px;
 }
 
-.ranking-card {
-  overflow: hidden;
-}
+.ranking-card { overflow: hidden; }
 
 .table-header {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .table-count {
   font-size: 12px;
   color: #78909c;
+}
+
+/* ✅ Botão exportar */
+.btn-export {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #118c3a;
+  color: #ffffff;
+  letter-spacing: 0.05em;
+  transition: background 0.18s, transform 0.18s;
+}
+
+.btn-export:hover:not(:disabled) {
+  background: #02983f;
+  transform: translateY(-1px);
+}
+
+.btn-export:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .table-wrapper {
@@ -416,9 +426,7 @@ onMounted(loadFilters)
   background-color: #f5f9f6;
 }
 
-.ranking-table tbody tr:hover {
-  background-color: #f9fcf9;
-}
+.ranking-table tbody tr:hover { background-color: #f9fcf9; }
 
 .badge-pos {
   display: inline-block;
@@ -449,23 +457,9 @@ onMounted(loadFilters)
 }
 
 @media (max-width: 900px) {
-  .admin-ranking-page {
-    padding: 20px 14px 28px;
-  }
-
-  .card {
-    padding: 18px 16px 18px;
-  }
-
-  .filters {
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  .filters-actions {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+  .admin-ranking-page { padding: 20px 14px 28px; }
+  .card { padding: 18px 16px 18px; }
+  .filters { flex-direction: column; gap: 20px; }
+  .filters-actions { flex-direction: column; align-items: flex-start; }
 }
 </style>
-
