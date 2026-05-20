@@ -14,31 +14,31 @@
         <input v-model="newTeam.cidade" placeholder="Cidade" required />
         <select v-model="newTeam.area_conhecimento" required>
           <option value="" disabled>Área de Conhecimento</option>
-          <option value="Ciências Humanas e Sociais">Ciências Humanas e Sociais</option>
+          <option value="Ciências Humanas e Ciências Sociais">Ciências Humanas e Ciências Sociais</option>
           <option value="Ciências da Natureza">Ciências da Natureza</option>
           <option value="Engenharias">Engenharias</option>
           <option value="Empreendedorismo">Empreendedorismo</option>
+          <option value="Mentes Criativas">Mentes Criativas</option>
         </select>
         <select v-model="newTeam.etapa_ensino" required>
           <option value="" disabled>Etapa de Ensino</option>
           <option value="Educação Infantil">Educação Infantil</option>
-          <option value="Anos Iniciais">Anos Iniciais</option>
-          <option value="Anos Finais">Anos Finais</option>
+          <option value="Ensino Fundamental Anos Iniciais">Ensino Fundamental Anos Iniciais</option>
+          <option value="Ensino Fundamental Anos Finais">Ensino Fundamental Anos Finais</option>
           <option value="Ensino Médio">Ensino Médio</option>
-          <option value="Anos Finais EJA">Anos Finais - EJA</option>
-          <option value="Ensino Médio EJA">Ensino Médio - EJA</option>
+          <option value="Educação de Jovens e Adultos (EJA)">Educação de Jovens e Adultos (EJA)</option>
         </select>
         <select v-model="newTeam.category" required>
           <option value="" disabled>Categoria da Premiação</option>
           <option value="Educação Infantil">Educação Infantil</option>
-          <option value="Anos Iniciais">Anos Iniciais</option>
-          <option value="Anos Finais">Anos Finais</option>
+          <option value="Ensino Fundamental Anos Iniciais">Anos Iniciais</option>
+          <option value="Ensino Fundamental Anos Finais">Anos Finais</option>
           <option value="Ciências da Natureza">Ciências da Natureza</option>
-          <option value="Ciências Humanas">Ciências Humanas</option>
+          <option value="Ciências Humanas e Ciências Sociais">Ciências Humanas e Ciências Sociais</option>
           <option value="Empreendedorismo">Empreendedorismo</option>
           <option value="Engenharias">Engenharias</option>
           <option value="Mentes Criativas">Mentes Criativas</option>
-          <option value="EJA">EJA</option>
+          <option value="Educação de Jovens e Adultos (EJA)">EJA</option>
         </select>
         <div class="form-actions">
           <button type="submit">Cadastrar Artigo</button>
