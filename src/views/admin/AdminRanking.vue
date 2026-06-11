@@ -80,9 +80,10 @@
       </div>
 
       <div class="ranking-note" v-if="ranking.length">
-        O score normalizado é a soma dos resultados normalizados dos modelos selecionados.
-        Quando um mesmo projeto recebe mais de uma avaliação no mesmo modelo, o sistema usa
-        a média dos z-scores e a média das notas brutas daquele modelo.
+        O score normalizado mostra o quanto a equipe se destacou na avaliação. 
+        Quanto maior o z-score, melhor a equipe foi avaliada dentro da régua do avaliador. 
+        Para efeito de comparação, esse cálculo corrige as distorções entre avaliadores que usam réguas mais rígidas ou mais generosas. 
+        Quando um projeto recebe mais de uma avaliação no mesmo modelo, o sistema usa a média dos z-scores e a média das notas brutas daquele modelo.
       </div>
 
       <div class="table-wrapper" v-if="ranking.length">
