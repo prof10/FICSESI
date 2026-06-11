@@ -53,6 +53,7 @@
         >
           {{ loading ? 'Carregando...' : 'Gerar ranking' }}
         </button>
+
         <p class="hint">
           Selecione pelo menos uma categoria, uma etapa e um modelo para gerar a classificação.
         </p>
@@ -62,11 +63,12 @@
     </section>
 
     <section class="card ranking-card">
-      <!-- ✅ table-header com botão de exportação -->
       <div class="table-header">
         <h2>Resultado</h2>
+
         <div style="display:flex; align-items:center; gap:12px;">
           <span class="table-count">{{ ranking.length }} equipe(s)</span>
+
           <button
             class="btn-export"
             @click="exportToExcel"
@@ -77,17 +79,27 @@
         </div>
       </div>
 
+      <div class="ranking-note" v-if="ranking.length">
+        O score normalizado é a soma dos resultados normalizados dos modelos selecionados.
+        Quando um mesmo projeto recebe mais de uma avaliação no mesmo modelo, o sistema usa
+        a média dos z-scores e a média das notas brutas daquele modelo.
+      </div>
+
       <div class="table-wrapper" v-if="ranking.length">
         <table class="ranking-table">
           <thead>
             <tr>
               <th>Posição</th>
-              <th>Nome do Artigo</th><!-- ✅ era "Projeto" -->
+              <th>Nome do Artigo</th>
               <th>Categoria da premiação</th>
               <th>Etapa</th>
+              <th>Score normalizado</th>
               <th>Pontuação</th>
+              <th>Avaliadores</th>
+              <th>Modelos somados</th>
             </tr>
           </thead>
+
           <tbody>
             <tr v-for="(row, index) in ranking" :key="row.team_id">
               <td>
@@ -98,7 +110,10 @@
               <td>{{ row.team_name }}</td>
               <td>{{ row.category }}</td>
               <td>{{ row.etapa_ensino }}</td>
-              <td class="score">{{ row.total_score }}</td>
+              <td class="score score-z">{{ formatZScore(row.total_z_score) }}</td>
+              <td class="score">{{ formatScore(row.total_score) }}</td>
+              <td>{{ row.evaluator_count }}</td>
+              <td>{{ row.template_count }}</td>
             </tr>
           </tbody>
         </table>
@@ -117,16 +132,16 @@ import * as XLSX from 'xlsx'
 import { supabase } from '@/composables/useSupabase.js'
 
 const categories = ref([])
-const etapas     = ref([])
-const templates  = ref([])
+const etapas = ref([])
+const templates = ref([])
 
-const selectedCategories  = ref([])
-const selectedEtapas      = ref([])
+const selectedCategories = ref([])
+const selectedEtapas = ref([])
 const selectedTemplateIds = ref([])
 
 const ranking = ref([])
 const loading = ref(false)
-const error   = ref('')
+const error = ref('')
 
 const loadFilters = async () => {
   error.value = ''
@@ -162,7 +177,7 @@ const loadFilters = async () => {
 }
 
 const loadRanking = async () => {
-  error.value   = ''
+  error.value = ''
   ranking.value = []
   loading.value = true
 
@@ -177,12 +192,19 @@ const loadRanking = async () => {
     }
 
     const { data, error: rankError } = await supabase
-      .from('team_template_averages')
-      .select('team_id, team_name, category, etapa_ensino, template_id, avg_score, evaluator_count')
-      .in('category',    selectedCategories.value)
+      .from('team_scores_raw')
+      .select(`
+        team_id,
+        evaluator_id,
+        template_id,
+        total_score,
+        team_name,
+        category,
+        etapa_ensino
+      `)
+      .in('category', selectedCategories.value)
       .in('etapa_ensino', selectedEtapas.value)
       .in('template_id', selectedTemplateIds.value)
-      .order('avg_score', { ascending: false })
 
     if (rankError) {
       error.value = 'Erro ao carregar ranking.'
@@ -194,20 +216,117 @@ const loadRanking = async () => {
       return
     }
 
-    const byTeam = new Map()
+    const numericRows = data.map(row => ({
+      ...row,
+      total_score: Number(row.total_score || 0)
+    }))
 
-    for (const row of data) {
-      const existing = byTeam.get(row.team_id)
+    const byEvaluator = new Map()
+
+    for (const row of numericRows) {
+      if (!byEvaluator.has(row.evaluator_id)) {
+        byEvaluator.set(row.evaluator_id, [])
+      }
+      byEvaluator.get(row.evaluator_id).push(row.total_score)
+    }
+
+    const evaluatorStats = new Map()
+
+    for (const [evaluatorId, scores] of byEvaluator.entries()) {
+      const mean = scores.reduce((sum, value) => sum + value, 0) / scores.length
+
+      const variance =
+        scores.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / scores.length
+
+      const stddev = Math.sqrt(variance)
+
+      evaluatorStats.set(evaluatorId, { mean, stddev })
+    }
+
+    const rowsWithZ = numericRows.map(row => {
+      const stats = evaluatorStats.get(row.evaluator_id)
+
+      const z_score =
+        !stats || stats.stddev === 0
+          ? 0
+          : (row.total_score - stats.mean) / stats.stddev
+
+      return {
+        ...row,
+        z_score
+      }
+    })
+
+    const byTeamTemplate = new Map()
+
+    for (const row of rowsWithZ) {
+      const key = `${row.team_id}__${row.template_id}`
+      const existing = byTeamTemplate.get(key)
+
       if (existing) {
-        existing.total_score += row.avg_score
+        existing.raw_sum += row.total_score
+        existing.z_sum += row.z_score
+        existing.count += 1
       } else {
-        byTeam.set(row.team_id, { ...row, total_score: row.avg_score })
+        byTeamTemplate.set(key, {
+          team_id: row.team_id,
+          template_id: row.template_id,
+          team_name: row.team_name,
+          category: row.category,
+          etapa_ensino: row.etapa_ensino,
+          raw_sum: row.total_score,
+          z_sum: row.z_score,
+          count: 1
+        })
       }
     }
 
-    ranking.value = Array.from(byTeam.values())
-      .sort((a, b) => b.total_score - a.total_score)
+    const teamTemplateAverages = Array.from(byTeamTemplate.values()).map(item => ({
+      ...item,
+      avg_score: item.raw_sum / item.count,
+      avg_z_score: item.z_sum / item.count,
+      evaluator_count: item.count
+    }))
 
+    const byTeam = new Map()
+
+    for (const row of teamTemplateAverages) {
+      const existing = byTeam.get(row.team_id)
+
+      if (existing) {
+        existing.total_score += row.avg_score
+        existing.total_z_score += row.avg_z_score
+        existing.evaluator_count += row.evaluator_count
+        existing.template_count += 1
+      } else {
+        byTeam.set(row.team_id, {
+          team_id: row.team_id,
+          team_name: row.team_name,
+          category: row.category,
+          etapa_ensino: row.etapa_ensino,
+          total_score: row.avg_score,
+          total_z_score: row.avg_z_score,
+          evaluator_count: row.evaluator_count,
+          template_count: 1
+        })
+      }
+    }
+
+    ranking.value = Array.from(byTeam.values()).sort((a, b) => {
+      if (b.total_z_score !== a.total_z_score) {
+        return b.total_z_score - a.total_z_score
+      }
+
+      if (b.total_score !== a.total_score) {
+        return b.total_score - a.total_score
+      }
+
+      if (b.template_count !== a.template_count) {
+        return b.template_count - a.template_count
+      }
+
+      return b.evaluator_count - a.evaluator_count
+    })
   } catch (err) {
     error.value = 'Erro inesperado.'
   } finally {
@@ -215,16 +334,21 @@ const loadRanking = async () => {
   }
 }
 
-// ✅ Exportar ranking para Excel
+const formatScore = value => Number(value || 0).toFixed(2)
+const formatZScore = value => Number(value || 0).toFixed(3)
+
 const exportToExcel = () => {
   if (!ranking.value.length) return
 
   const rows = ranking.value.map((row, index) => ({
-    'Posição':                index + 1,
-    'Nome do Artigo':         row.team_name,
+    'Posição': index + 1,
+    'Nome do Artigo': row.team_name,
     'Categoria da Premiação': row.category,
-    'Etapa de Ensino':        row.etapa_ensino,
-    'Pontuação':              row.total_score,
+    'Etapa de Ensino': row.etapa_ensino,
+    'Score Normalizado': Number(row.total_z_score || 0).toFixed(3),
+    'Pontuação': Number(row.total_score || 0).toFixed(2),
+    'Qtd. Avaliadores': row.evaluator_count,
+    'Modelos Somados': row.template_count
   }))
 
   const ws = XLSX.utils.json_to_sheet(rows)
@@ -232,8 +356,11 @@ const exportToExcel = () => {
     { wch: 10 },
     { wch: 70 },
     { wch: 25 },
-    { wch: 30 },
+    { wch: 25 },
+    { wch: 18 },
     { wch: 12 },
+    { wch: 16 },
+    { wch: 18 }
   ]
 
   const wb = XLSX.utils.book_new()
@@ -255,7 +382,7 @@ onMounted(loadFilters)
 }
 
 .page-header {
-  max-width: 960px;
+  max-width: 1080px;
   margin: 0 auto 20px;
 }
 
@@ -274,7 +401,7 @@ onMounted(loadFilters)
 }
 
 .card {
-  max-width: 960px;
+  max-width: 1080px;
   margin: 0 auto 20px;
   background: #ffffff;
   border-radius: 18px;
@@ -298,7 +425,9 @@ onMounted(loadFilters)
   flex-wrap: wrap;
 }
 
-.filter-block { min-width: 200px; }
+.filter-block {
+  min-width: 200px;
+}
 
 .filter-block h3 {
   margin: 0 0 6px;
@@ -362,7 +491,9 @@ onMounted(loadFilters)
   font-size: 13px;
 }
 
-.ranking-card { overflow: hidden; }
+.ranking-card {
+  overflow: hidden;
+}
 
 .table-header {
   display: flex;
@@ -378,7 +509,17 @@ onMounted(loadFilters)
   color: #78909c;
 }
 
-/* ✅ Botão exportar */
+.ranking-note {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f5fbf6;
+  border: 1px solid #dceedd;
+  color: #546e7a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .btn-export {
   border: none;
   border-radius: 999px;
@@ -418,15 +559,19 @@ onMounted(loadFilters)
   padding: 10px 8px;
   text-align: left;
   border-bottom: 1px solid #eceff1;
+  vertical-align: middle;
 }
 
 .ranking-table th {
   font-weight: 600;
   color: #455a64;
   background-color: #f5f9f6;
+  white-space: nowrap;
 }
 
-.ranking-table tbody tr:hover { background-color: #f9fcf9; }
+.ranking-table tbody tr:hover {
+  background-color: #f9fcf9;
+}
 
 .badge-pos {
   display: inline-block;
@@ -450,6 +595,10 @@ onMounted(loadFilters)
   color: #118c3a;
 }
 
+.score-z {
+  color: #1565c0;
+}
+
 .no-data {
   margin-top: 8px;
   font-size: 13px;
@@ -457,9 +606,22 @@ onMounted(loadFilters)
 }
 
 @media (max-width: 900px) {
-  .admin-ranking-page { padding: 20px 14px 28px; }
-  .card { padding: 18px 16px 18px; }
-  .filters { flex-direction: column; gap: 20px; }
-  .filters-actions { flex-direction: column; align-items: flex-start; }
+  .admin-ranking-page {
+    padding: 20px 14px 28px;
+  }
+
+  .card {
+    padding: 18px 16px 18px;
+  }
+
+  .filters {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .filters-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>
