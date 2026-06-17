@@ -131,8 +131,18 @@
                   rows="3"
                   v-model="answers[item.question.id]"
                   required
+                  maxlength="500"
                   placeholder="Digite sua resposta"
                 ></textarea>
+                <div
+                  class="char-count"
+                  :class="{
+                    warning: getTextLength(item.question.id) >= 450,
+                    danger: getTextLength(item.question.id) >= 500
+                  }"
+                >
+                  {{ getTextLength(item.question.id) }} / 500
+                </div>
               </div>
 
               <!-- Fallback: texto -->
@@ -141,8 +151,18 @@
                   rows="3"
                   v-model="answers[item.question.id]"
                   required
+                  maxlength="500"
                   placeholder="Digite sua resposta"
                 ></textarea>
+                <div
+                  class="char-count"
+                  :class="{
+                    warning: getTextLength(item.question.id) >= 450,
+                    danger: getTextLength(item.question.id) >= 500
+                  }"
+                >
+                  {{ getTextLength(item.question.id) }} / 500
+                </div>
               </div>
             </div>
 
@@ -164,6 +184,8 @@
 import { ref } from 'vue'
 import { supabase } from '@/composables/useSupabase.js'
 import { templateQuestionsService } from '@/services/supabase.js'
+
+const MAX_COMMENT_LENGTH = 500
 
 const code = ref('')
 const assignment = ref(null)
@@ -252,6 +274,20 @@ const setStar = (questionId, value) => {
   }
 }
 
+const getTextLength = (questionId) => {
+  return String(answers.value[questionId] || '').length
+}
+
+const sanitizeAnswer = (value, questionType) => {
+  if (questionType === 'escala') {
+    return String(value ?? 0)
+  }
+
+  return String(value ?? '')
+    .trim()
+    .slice(0, MAX_COMMENT_LENGTH)
+}
+
 // remove tags HTML para o CSV
 const stripHtml = (html) => {
   if (!html) return ''
@@ -275,7 +311,7 @@ const makeCsvAndDownload = () => {
 
   const lines = questions.value.map((item, index) => {
     const q = item.question
-    const value = answers.value[q.id]
+    const value = sanitizeAnswer(answers.value[q.id], q.type)
 
     const plainQuestion = stripHtml(q.text)
 
@@ -314,24 +350,35 @@ const makeCsvAndDownload = () => {
 const handleSubmitEvaluation = async () => {
   if (!assignment.value) return
 
-  // valida respostas: texto em branco e notas 0
   const zeros = []
   const vazias = []
+  const longas = []
 
   questions.value.forEach((item, index) => {
     const qid = item.question.id
-    const value = answers.value[qid]
+    const rawValue = answers.value[qid]
 
     if (item.question.type === 'escala') {
-      if (value === 0 || value === '0') {
+      if (rawValue === 0 || rawValue === '0') {
         zeros.push(index + 1)
       }
     } else {
-      if (value === '' || value === null || value === undefined) {
+      const textValue = String(rawValue ?? '').trim()
+
+      if (!textValue) {
         vazias.push(index + 1)
+      }
+
+      if (textValue.length > MAX_COMMENT_LENGTH) {
+        longas.push(index + 1)
       }
     }
   })
+
+  if (longas.length) {
+    error.value = `As questões ${longas.join(', ')} ultrapassam o limite de ${MAX_COMMENT_LENGTH} caracteres.`
+    return
+  }
 
   if (vazias.length || zeros.length) {
     let msg = ''
@@ -357,7 +404,10 @@ const handleSubmitEvaluation = async () => {
     const rows = questions.value.map((item) => ({
       assignment_id: assignment.value.id,
       question_id: item.question.id,
-      answer_value: String(answers.value[item.question.id])
+      answer_value: sanitizeAnswer(
+        answers.value[item.question.id],
+        item.question.type
+      )
     }))
 
     const { error: insertError } = await supabase
@@ -499,6 +549,7 @@ const handleSubmitEvaluation = async () => {
   margin-top: 8px;
   color: #d32f2f;
   font-size: 13px;
+  white-space: pre-line;
 }
 
 .team-card {
@@ -580,6 +631,23 @@ const handleSubmitEvaluation = async () => {
 .question-block textarea:focus {
   border-color: #118c3a;
   box-shadow: 0 0 0 2px rgba(17, 140, 58, 0.18);
+}
+
+.char-count {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #78909c;
+  text-align: right;
+}
+
+.char-count.warning {
+  color: #ef6c00;
+  font-weight: 600;
+}
+
+.char-count.danger {
+  color: #d32f2f;
+  font-weight: 700;
 }
 
 /* Estrelas 0–5 */
@@ -685,6 +753,11 @@ const handleSubmitEvaluation = async () => {
   .code-form button {
     width: 100%;
     text-align: center;
+  }
+
+  .stars-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>
