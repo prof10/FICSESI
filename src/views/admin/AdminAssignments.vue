@@ -504,6 +504,7 @@ const exportToExcel = () => {
 }
 
 // ── Exportar Respostas para Excel ─────────────────────────────
+// ── Exportar Respostas para Excel ─────────────────────────────
 const exportAnswersToExcel = async () => {
   if (!sortedAssignments.value.length) {
     alert('Nenhuma atribuição para exportar.')
@@ -513,34 +514,39 @@ const exportAnswersToExcel = async () => {
   try {
     const ids = sortedAssignments.value.map(a => a.id)
 
-    const { data: answers, error: err } = await supabase
-      .from('evaluation_answers')
+    const { data, error: err } = await supabase
+      .from('assignments')
       .select(`
-        assignment_id,
-        answer_value,
-        question:questions ( id, text, type )
+        id,
+        code,
+        status,
+        team_id,
+        team:teams (
+          name,
+          numero_estande,
+          category,
+          area_conhecimento
+        ),
+        evaluator:evaluators (
+          name
+        ),
+        template:evaluation_templates (
+          name,
+          type
+        ),
+        answers:evaluation_answers (
+          question_id,
+          answer_value,
+          question:questions (
+            id,
+            text,
+            type
+          )
+        )
       `)
-      .in('assignment_id', ids)
+      .in('id', ids)
 
     if (err) throw err
-
-    // Extrai perguntas únicas mantendo ordem de aparição
-    const questionsMap = new Map()
-    ;(answers || []).forEach(ans => {
-      if (ans.question && !questionsMap.has(ans.question.id)) {
-        questionsMap.set(ans.question.id, ans.question)
-      }
-    })
-    const questionsList = [...questionsMap.values()]
-
-    // Agrupa respostas por assignment_id
-    const answersByAssignment = {}
-    ;(answers || []).forEach(ans => {
-      if (!answersByAssignment[ans.assignment_id]) {
-        answersByAssignment[ans.assignment_id] = {}
-      }
-      answersByAssignment[ans.assignment_id][ans.question.id] = ans.answer_value
-    })
 
     // Remove tags HTML do texto da pergunta
     const stripHtml = (html = '') => {
@@ -549,24 +555,55 @@ const exportAnswersToExcel = async () => {
       return tmp.textContent || tmp.innerText || ''
     }
 
-    // Monta linhas — uma por atribuição
-    const rows = sortedAssignments.value.map(a => {
+    // Mapa global de perguntas encontradas nas atribuições exportadas
+    const questionsMap = new Map()
+
+    ;(data || []).forEach(a => {
+      ;(a.answers || []).forEach(ans => {
+        const q = ans.question
+        if (q?.id && !questionsMap.has(q.id)) {
+          questionsMap.set(q.id, {
+            id: q.id,
+            text: stripHtml(q.text),
+            type: q.type
+          })
+        }
+      })
+    })
+
+    const questionsList = [...questionsMap.values()]
+
+    // Mantém a ordem visual da tela original
+    const assignmentsInOrder = sortedAssignments.value.map(sa => {
+      return (data || []).find(d => d.id === sa.id)
+    }).filter(Boolean)
+
+    // Monta uma linha por atribuição
+    const rows = assignmentsInOrder.map(a => {
       const base = {
-        'Código':                 a.code,
-        'N° Estande':             a.team?.numero_estande || getTeamField(a.team_id, 'numero_estande') || '—',
-        'Categoria da Premiação': a.team?.category       || getTeamField(a.team_id, 'category')       || '—',
-        'Área de Conhecimento':   a.team?.area_conhecimento || getTeamField(a.team_id, 'area_conhecimento') || '—',
-        'Nome do Artigo':         a.team?.name            || getTeamField(a.team_id, 'name')           || '—',
-        'Avaliador':              a.evaluator?.name        || '—',
-        'Tipo':                   a.template?.type === 'online' ? 'Virtual' : 'Pitch',
-        'Status':                 a.status === 'respondido' ? 'RESPONDIDO' : 'PENDENTE',
+        'Código': a.code,
+        'N° Estande': a.team?.numero_estande || getTeamField(a.team_id, 'numero_estande') || '—',
+        'Categoria da Premiação': a.team?.category || getTeamField(a.team_id, 'category') || '—',
+        'Área de Conhecimento': a.team?.area_conhecimento || getTeamField(a.team_id, 'area_conhecimento') || '—',
+        'Nome do Artigo': a.team?.name || getTeamField(a.team_id, 'name') || '—',
+        'Avaliador': a.evaluator?.name || '—',
+        'Tipo': a.template?.type === 'online' ? 'Virtual' : 'Pitch',
+        'Status': a.status === 'respondido' ? 'RESPONDIDO' : 'PENDENTE',
       }
 
-      // Coluna dinâmica por pergunta
+      const answersMap = {}
+      ;(a.answers || []).forEach(ans => {
+        if (ans.question?.id) {
+          answersMap[ans.question.id] = ans.answer_value
+        }
+      })
+
       questionsList.forEach((q, idx) => {
-        const colName = `Q${idx + 1} - ${stripHtml(q.text).slice(0, 60)}`
-        const val = answersByAssignment[a.id]?.[q.id]
-        base[colName] = val !== undefined ? val : '—'
+        const colName = `Q${idx + 1} - ${q.text.slice(0, 60)}`
+        const val = answersMap[q.id]
+        base[colName] = val !== undefined && val !== null && String(val) !== ''
+          ? val
+          : '—'
       })
 
       return base
@@ -574,10 +611,15 @@ const exportAnswersToExcel = async () => {
 
     const ws = XLSX.utils.json_to_sheet(rows)
 
-    // Largura: 8 colunas fixas + colunas de perguntas
     ws['!cols'] = [
-      { wch: 14 }, { wch: 12 }, { wch: 25 }, { wch: 25 },
-      { wch: 60 }, { wch: 25 }, { wch: 10 }, { wch: 14 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 25 },
+      { wch: 25 },
+      { wch: 60 },
+      { wch: 25 },
+      { wch: 10 },
+      { wch: 14 },
       ...questionsList.map(() => ({ wch: 30 }))
     ]
 
@@ -586,7 +628,6 @@ const exportAnswersToExcel = async () => {
 
     const date = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
     XLSX.writeFile(wb, `respostas_${date}.xlsx`)
-
   } catch (err) {
     error.value = 'Erro ao exportar respostas: ' + err.message
   }
