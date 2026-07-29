@@ -361,7 +361,7 @@ const resolveRows = (rows) => {
     }
 
     const tipoNorm = normalize(mapped.tipo)
-    const tipoKey  = tipoNorm === 'online' || tipoNorm === 'virtual' ? 'online' : 'pitch'
+    const tipoKey  = tipoNorm === 'online' || tipoNorm === 'virtual' ? 'online' : 'presencial'
     const template = templates.value.find(t => t.type === tipoKey)
 
     if (!template) {
