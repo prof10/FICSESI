@@ -57,8 +57,8 @@
         <span style="font-size:12px; color:#2e7d32;">
           ⚠️ Os valores de <strong>Nome do Artigo</strong> e <strong>Avaliador</strong> devem
           corresponder exatamente aos já cadastrados no sistema.<br />
-          O campo <strong>TIPO</strong> deve ser <strong>online</strong> (Virtual) ou
-          <strong>pitch</strong> (Pitch).
+          O campo <strong>TIPO</strong> deve ser <strong>online</strong> ou
+          <strong>pitch</strong>
         </span>
       </p>
 
