@@ -511,102 +511,186 @@ const exportAnswersToExcel = async () => {
     return
   }
 
+  error.value = ''
+
+  const throwSupabaseError = (context, supabaseError) => {
+    console.group(`❌ ${context}`)
+    console.error('Erro retornado:', supabaseError)
+    console.error('message:', supabaseError?.message)
+    console.error('code:', supabaseError?.code)
+    console.error('details:', supabaseError?.details)
+    console.error('hint:', supabaseError?.hint)
+    console.groupEnd()
+
+    throw new Error(
+      [
+        context,
+        supabaseError?.message,
+        supabaseError?.details,
+        supabaseError?.hint,
+        supabaseError?.code ? `Código: ${supabaseError.code}` : ''
+      ]
+        .filter(Boolean)
+        .join('\n\n')
+    )
+  }
+
   try {
-    const ids = sortedAssignments.value.map(a => a.id)
+    // A tela já possui todas as atribuições: não consulte assignments novamente.
+    const assignmentsToExport = [...sortedAssignments.value]
 
-    const { data, error: err } = await supabase
-      .from('assignments')
-      .select(`
-        id,
-        code,
-        status,
-        team_id,
-        team:teams (
-          name,
-          numero_estande,
-          category,
-          area_conhecimento
-        ),
-        evaluator:evaluators (
-          name
-        ),
-        template:evaluation_templates (
-          name,
-          type
-        ),
-        answers:evaluation_answers (
-          question_id,
-          answer_value,
-          question:questions (
-            id,
-            text,
-            type
-          )
-        )
-      `)
-      .in('id', ids)
+    const ids = assignmentsToExport
+      .map(assignment => assignment.id)
+      .filter(Boolean)
 
-    if (err) throw err
-
-    // Remove tags HTML do texto da pergunta
-    const stripHtml = (html = '') => {
-      const tmp = document.createElement('div')
-      tmp.innerHTML = html
-      return tmp.textContent || tmp.innerText || ''
+    if (!ids.length) {
+      throw new Error('Não foi possível identificar as atribuições para exportação.')
     }
 
-    // Mapa global de perguntas encontradas nas atribuições exportadas
-    const questionsMap = new Map()
+    console.log(
+      `Buscando respostas de ${ids.length} atribuição(ões)...`
+    )
 
-    ;(data || []).forEach(a => {
-      ;(a.answers || []).forEach(ans => {
-        const q = ans.question
-        if (q?.id && !questionsMap.has(q.id)) {
-          questionsMap.set(q.id, {
-            id: q.id,
-            text: stripHtml(q.text),
-            type: q.type
-          })
-        }
-      })
-    })
+    // Evita uma URL enorme quando existirem muitas atribuições.
+    // Consulta em blocos de 100 IDs.
+    const chunkArray = (array, size = 100) => {
+      const chunks = []
 
-    const questionsList = [...questionsMap.values()]
-
-    // Mantém a ordem visual da tela original
-    const assignmentsInOrder = sortedAssignments.value.map(sa => {
-      return (data || []).find(d => d.id === sa.id)
-    }).filter(Boolean)
-
-    // Monta uma linha por atribuição
-    const rows = assignmentsInOrder.map(a => {
-      const base = {
-        'Código': a.code,
-        'N° Estande': a.team?.numero_estande || getTeamField(a.team_id, 'numero_estande') || '—',
-        'Categoria da Premiação': a.team?.category || getTeamField(a.team_id, 'category') || '—',
-        'Área de Conhecimento': a.team?.area_conhecimento || getTeamField(a.team_id, 'area_conhecimento') || '—',
-        'Nome do Artigo': a.team?.name || getTeamField(a.team_id, 'name') || '—',
-        'Avaliador': a.evaluator?.name || '—',
-        'Tipo': a.template?.type === 'online' ? 'Virtual' : 'Pitch',
-        'Status': a.status === 'respondido' ? 'RESPONDIDO' : 'PENDENTE',
+      for (let index = 0; index < array.length; index += size) {
+        chunks.push(array.slice(index, index + size))
       }
 
-      const answersMap = {}
-      ;(a.answers || []).forEach(ans => {
-        if (ans.question?.id) {
-          answersMap[ans.question.id] = ans.answer_value
+      return chunks
+    }
+
+    const answersData = []
+
+    for (const idChunk of chunkArray(ids, 100)) {
+      const { data, error: answersError } = await supabase
+        .from('evaluation_answers')
+        .select('id, assignment_id, question_id, answer_value')
+        .in('assignment_id', idChunk)
+
+      if (answersError) {
+        throwSupabaseError(
+          'Erro ao consultar a tabela evaluation_answers',
+          answersError
+        )
+      }
+
+      answersData.push(...(data || []))
+    }
+
+    console.log(`✅ ${answersData.length} resposta(s) encontrada(s).`)
+
+    const questionIds = [
+      ...new Set(
+        answersData
+          .map(answer => answer.question_id)
+          .filter(Boolean)
+      )
+    ]
+
+    const questionsData = []
+
+    // Também busca perguntas em blocos, por segurança.
+    for (const idChunk of chunkArray(questionIds, 100)) {
+      const { data, error: questionsError } = await supabase
+        .from('questions')
+        .select('id, text, type')
+        .in('id', idChunk)
+
+      if (questionsError) {
+        throwSupabaseError(
+          'Erro ao consultar a tabela questions',
+          questionsError
+        )
+      }
+
+      questionsData.push(...(data || []))
+    }
+
+    console.log(`✅ ${questionsData.length} pergunta(s) encontrada(s).`)
+
+    const stripHtml = (html = '') => {
+      const element = document.createElement('div')
+      element.innerHTML = String(html)
+      return (element.textContent || element.innerText || '').trim()
+    }
+
+    const questionsMap = new Map(
+      questionsData.map(question => [
+        question.id,
+        {
+          id: question.id,
+          text: stripHtml(question.text) || `Pergunta ${question.id}`,
+          type: question.type
         }
+      ])
+    )
+
+    // Mantém a sequência em que as perguntas apareceram nas respostas.
+    const questionsList = questionIds
+      .map(id => questionsMap.get(id))
+      .filter(Boolean)
+
+    // Organiza as respostas por atribuição.
+    const answersByAssignment = new Map()
+
+    answersData.forEach(answer => {
+      if (!answersByAssignment.has(answer.assignment_id)) {
+        answersByAssignment.set(answer.assignment_id, [])
+      }
+
+      answersByAssignment.get(answer.assignment_id).push(answer)
+    })
+
+    const rows = assignmentsToExport.map(assignment => {
+      const team =
+        assignment.team ||
+        teams.value.find(item => item.id === assignment.team_id)
+
+      const evaluator =
+        assignment.evaluator ||
+        evaluators.value.find(item => item.id === assignment.evaluator_id)
+
+      const template =
+        assignment.template ||
+        templates.value.find(item => item.id === assignment.template_id)
+
+      const row = {
+        'Código': assignment.code || '—',
+        'N° Estande': team?.numero_estande || '—',
+        'Categoria da Premiação': team?.category || '—',
+        'Área de Conhecimento': team?.area_conhecimento || '—',
+        'Nome do Artigo': team?.name || '—',
+        'Avaliador': evaluator?.name || '—',
+        'Tipo': template?.type === 'online' ? 'Virtual' : 'Pitch',
+        'Status': assignment.status === 'respondido'
+          ? 'RESPONDIDO'
+          : 'PENDENTE'
+      }
+
+      const answersMap = new Map(
+        (answersByAssignment.get(assignment.id) || []).map(answer => [
+          answer.question_id,
+          answer.answer_value
+        ])
+      )
+
+      questionsList.forEach((question, index) => {
+        const columnName = `Q${index + 1} - ${question.text.slice(0, 60)}`
+        const value = answersMap.get(question.id)
+
+        row[columnName] =
+          value !== undefined &&
+          value !== null &&
+          String(value).trim() !== ''
+            ? String(value)
+            : '—'
       })
 
-      questionsList.forEach((q, idx) => {
-        const colName = `Q${idx + 1} - ${q.text.slice(0, 60)}`
-        const val = answersMap[q.id]
-        base[colName] = val !== undefined && val !== null && String(val) !== ''
-          ? val
-          : '—'
-      })
-
-      return base
+      return row
     })
 
     const ws = XLSX.utils.json_to_sheet(rows)
@@ -618,18 +702,49 @@ const exportAnswersToExcel = async () => {
       { wch: 25 },
       { wch: 60 },
       { wch: 25 },
-      { wch: 10 },
+      { wch: 12 },
       { wch: 14 },
-      ...questionsList.map(() => ({ wch: 30 }))
+      ...questionsList.map(() => ({ wch: 35 }))
     ]
 
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Respostas')
 
-    const date = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
-    XLSX.writeFile(wb, `respostas_${date}.xlsx`)
+    const excelData = XLSX.write(wb, {
+      bookType: 'xlsx',
+      type: 'array'
+    })
+
+    const date = new Date()
+      .toLocaleDateString('pt-BR')
+      .replace(/\//g, '-')
+
+    const blob = new Blob([excelData], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })
+
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = `respostas_${date}.xlsx`
+    link.style.display = 'none'
+
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+
+    console.log('✅ Exportação concluída.')
   } catch (err) {
-    error.value = 'Erro ao exportar respostas: ' + err.message
+    console.error('❌ Erro completo ao exportar respostas:', err)
+
+    const message = err?.message || 'Erro desconhecido ao exportar respostas.'
+
+    error.value = `Erro ao exportar respostas: ${message}`
+
+    alert(`Não foi possível exportar as respostas.\n\n${message}`)
   }
 }
 
